@@ -20,6 +20,7 @@ class Parser {
 
     std::unique_ptr<CompUnit> parser();
 
+    private:
     std::unique_ptr<Decl> parse_decl();
     std::unique_ptr<ConstDecl> parse_const_decl();
     std::unique_ptr<VarDecl> parse_var_decl();

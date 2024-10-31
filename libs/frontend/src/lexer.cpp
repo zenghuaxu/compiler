@@ -1,4 +1,4 @@
-#include "include/lexer.h"
+#include "../include/lexer.h"
 //
 // Created by LENOVO on 2024/9/19.
 //

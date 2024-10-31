@@ -1,7 +1,7 @@
 //
 // Created by LENOVO on 2024/10/7.
 //
-#include "include/ast.h"
+#include "../include/ast.h"
 
 #define LPARENT    "LPARENT ("
 #define RPARENT    "RPARENT )"

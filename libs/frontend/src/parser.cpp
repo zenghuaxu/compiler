@@ -2,9 +2,8 @@
 // Created by LENOVO on 2024/10/6.
 //
 
-#include "include/parser.h"
-#include "include/ast.h"
-#include "include/configure.h"
+#include "../include/parser.h"
+#include "../include/ast.h"
 #include <cassert>
 
 #include <memory>
@@ -23,6 +22,7 @@ std::unique_ptr<CompUnit> Parser::parse_comp_unit() {
         compUnit->func_defs.push_back(parse_func_def());
     }
     compUnit->main_func_def = parse_main_func_def();
+    compUnit->line = compUnit->main_func_def->line;
     return compUnit;
 }
 
@@ -637,7 +637,9 @@ std::unique_ptr<ForStmt> Parser::parse_for_stmt() {
 }
 
 std::unique_ptr<BreakStmt> Parser::parse_break_stmt() {
+    auto breakStmt = std::make_unique<BreakStmt>();
     assert(tokens.at(currentPos) == TokenType::BREAKTK);
+    breakStmt->line = tokens.at(currentPos).getLine();
     currentPos++;
     if (tokens.at(currentPos) == TokenType::SEMICN) {
         currentPos++;
@@ -645,11 +647,13 @@ std::unique_ptr<BreakStmt> Parser::parse_break_stmt() {
     else {
         errors.emplace_back('i', tokens.at(currentPos - 1).getLine());
     }
-    return std::make_unique<BreakStmt>();
+    return breakStmt;
 }
 
 std::unique_ptr<ContinueStmt> Parser::parse_continue_stmt() {
+    auto continueStmt = std::make_unique<ContinueStmt>();
     assert(tokens.at(currentPos) == TokenType::CONTINUETK);
+    continueStmt->line = tokens.at(currentPos).getLine();
     currentPos++;
     if (tokens.at(currentPos) == TokenType::SEMICN) {
         currentPos++;
@@ -657,13 +661,14 @@ std::unique_ptr<ContinueStmt> Parser::parse_continue_stmt() {
     else {
         errors.emplace_back('i', tokens.at(currentPos - 1).getLine());
     }
-    return std::make_unique<ContinueStmt>();
+    return continueStmt;
 }
 
 std::unique_ptr<ReturnStmt> Parser::parse_return_stmt() {
-    assert(tokens.at(currentPos) == TokenType::RETURNTK);
-    currentPos++;
     auto returnStmt = std::make_unique<ReturnStmt>();
+    assert(tokens.at(currentPos) == TokenType::RETURNTK);
+    returnStmt->line = tokens.at(currentPos).getLine();
+    currentPos++;
 
     if (can_be_exp()) {
         returnStmt->exp = parse_exp();
@@ -685,6 +690,7 @@ std::unique_ptr<ReturnStmt> Parser::parse_return_stmt() {
 std::unique_ptr<PrintfStmt> Parser::parse_printf_stmt() {
     auto printfStmt = std::make_unique<PrintfStmt>();
     assert(tokens.at(currentPos) == TokenType::PRINTFTK);
+    printfStmt->line = tokens.at(currentPos).getLine();
     currentPos++;
     assert(tokens.at(currentPos) == TokenType::LPARENT);
     currentPos++;
@@ -794,6 +800,7 @@ std::unique_ptr<Block> Parser::parse_block() {
     }
 
     assert(tokens.at(currentPos) == TokenType::RBRACE);
+    block->line = tokens.at(currentPos).getLine();
     currentPos++;
     return block;
 }

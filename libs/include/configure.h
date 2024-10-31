@@ -5,9 +5,13 @@
 #ifndef MACRO_H
 
 //#define DEBUG
-#define DEBUG_PARSER
+// #define DEBUG_PARSER
+#define DEBUG_SEMANTIC
+
 //#define LEXER_
-#define PARSER_
+//#define PARSER_
+#define SEMANTIC_
+#define SYMTABLE_
 
 #define MACRO_H
 

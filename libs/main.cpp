@@ -5,21 +5,11 @@
 #include <iostream>
 #include <fstream>
 
-#include  "include/configure.h"
-#include  "include/lexer.h"
-#include "include/parser.h"
-
-#define INPUT_OPEN(x)      std::ifstream x("testfile.txt");\
-                           if (!x.is_open()) {\
-                                std::cerr << "Error opening file" << std::endl;\
-                                return -1;\
-                           }
-
-#define OUTPUT_OPEN(x, y)    std::ofstream x(#y);\
-                             if (!x.is_open()) {\
-                                std::cerr << "Error opening file" << std::endl;\
-                                return -1;\
-                             }
+#include "include/configure.h"
+#include "frontend/include/lexer.h"
+#include "frontend/include/parser.h"
+#include "frontend/include/visitor.h"
+#include "include/io.h"
 
 int main() {
     //open src file
@@ -35,9 +25,8 @@ int main() {
         lexer.nextToken();
     }
     input.close();
-
     #ifdef LEXER_
-        OUTPUT_OPEN(output, lexer.txt);
+        OUTPUT_OPEN(output, lexer.txt)
         for (const Token& token : tokens) {
             output << token.toString() << std::endl;
         }
@@ -45,13 +34,24 @@ int main() {
     #endif
 
     //syntactic analysis
+    auto parser = Parser(tokens, errors);
+    auto comp_unit_ptr = parser.parser();
     #ifdef  PARSER_
-        OUTPUT_OPEN(output, parser.txt);
-        auto parser = Parser(tokens, errors);
-        parser.parser()->print(output);
+        OUTPUT_OPEN(output, parser.txt)
+        comp_unit_ptr->print(output);
         output.close();
     #endif
 
+    //semantic analysis
+    comp_unit_ptr->print(std::cout);
+    auto visitor = Visitor(errors);
+    visitor.visit(*comp_unit_ptr);
+    #ifdef SEMANTIC_
+        OUTPUT_OPEN(output, symbol.txt)
+        visitor.print_symbol(output);
+    #endif
+
+    //error output
     std::sort(errors.begin(), errors.end());
     OUTPUT_OPEN(err, error.txt)
     for (Error error : errors) {

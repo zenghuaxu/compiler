@@ -128,6 +128,10 @@ class Token {
         return type == t;
     }
 
+    TokenType getType() const {
+        return type;
+    }
+
     int getLine() const {
         return line;
     }
