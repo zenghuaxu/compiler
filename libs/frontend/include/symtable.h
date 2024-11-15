@@ -27,6 +27,8 @@ class SymType {
     virtual bool isConst() = 0;
     virtual bool isVoid() = 0;
     virtual bool isInt() = 0;
+    virtual bool isInferable() = 0;
+    virtual void set_inferable() = 0;
     virtual ValueReturnTypePtr toValueType(LLVMContextPtr context) = 0;
     virtual void print(std::ostream &out) = 0;
 };
@@ -42,10 +44,11 @@ class BasicType final : public SymType {
     private:
     basic_type type;
     bool constant_obj;
+    bool inferable;
 
     public:
     BasicType(const bool constant_obj, const TokenType token_type):
-    constant_obj(constant_obj) {
+    constant_obj(constant_obj), inferable(constant_obj) {
         static std::map<TokenType, basic_type> basic_type_map = {
             {TokenType::INTTK, int_type},
             {TokenType::CHARTK, char_type},
@@ -74,6 +77,14 @@ class BasicType final : public SymType {
 
     bool isConst() override {
         return constant_obj;
+    }
+
+    bool isInferable() override {
+        return inferable;
+    }
+
+    void set_inferable() override {
+        inferable = false;
     }
 
     void print(std::ostream &out) override {
@@ -155,6 +166,12 @@ class ArrayType final : public SymType {
         return _element_type->isConst();
     }
 
+    bool isInferable() override {
+        return false;//value not ferable
+    }
+
+    void set_inferable() override {}
+
     bool isVoid() override {
         return false;
     }
@@ -207,6 +224,12 @@ class FunctionType : public SymType {
     bool isConst() override {
         return false;
     }
+
+    bool isInferable() override {
+        return false;//value not ferable
+    }
+
+    void set_inferable() override {}
 
     void print(std::ostream &out) override {
         _return_type->print(out);

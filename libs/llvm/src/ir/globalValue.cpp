@@ -10,7 +10,7 @@
 #include "../../include/llvmContext.h"
 
 GlobalValue::GlobalValue(ValueReturnTypePtr return_type, std::string name):
-    Value(return_type->getContext()->toPointerType(return_type)
+    Value(return_type->getContext()->getPointerType(return_type)
     //array to pointer
     , ValueType::GlobalVariable) {
     return_type->getContext()->SaveValue<GlobalValue>(this);

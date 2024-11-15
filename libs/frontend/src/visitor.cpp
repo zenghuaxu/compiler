@@ -58,19 +58,6 @@ void Visitor::visit_rel_exp(RelExp &node) {
     visit_add_exp(*node.rhs, type);
 }
 
-//
-// ValuePtr Visitor::type_conversion(std::shared_ptr<SymType> &origin,
-//     const std::shared_ptr<SymType>& target,
-//     ValuePtr &value) {
-//     if (!(*origin == target)) {
-//         if (target->isInt()) {
-//             return new ZextInstruction(value, current_basic_block);
-//         }
-//         return new TruncInstruction(value, current_basic_block);
-//     }
-//     return value;
-// }
-
 /**
  *
  * @param origin origin type
@@ -79,9 +66,12 @@ void Visitor::visit_rel_exp(RelExp &node) {
  * @return instruction
  * NOTICE:: CHAR->INT ZERO EXTENSION?
  */
-
 ValuePtr Visitor::type_conversion(ValueReturnTypePtr origin, ValueReturnTypePtr target, ValuePtr value) {
     if (origin != target) {
+        if (typeid(*value) == typeid(Constant)) {
+            return new Constant(dynamic_cast<ConstantPtr>(value)->get_value(), target);
+        }
+        //TODO MORE COMPLICATED accommodation
         if (target->isInt()) {
             return new ZextInstruction(value, current_basic_block);
         }
@@ -113,13 +103,15 @@ ValuePtr Visitor::visit_add_exp(AddExp &node, std::shared_ptr<SymType> &type) {
     type = l_type->isConst() ? r_type->evaluate() : l_type->evaluate();
 
     //CONSTANT INFERENCE
-    if (type->isConst()) {
-        auto constant_l = dynamic_cast<ConstantPtr>(left);
-        auto constant_r = dynamic_cast<ConstantPtr>(right);
+    auto constant_l = dynamic_cast<ConstantPtr>(left);
+    auto constant_r = dynamic_cast<ConstantPtr>(right);
+    if (constant_l && constant_r) {
         return Constant::merge(constant_l, constant_r, node.op->getType());
     }
 
     auto value_return_type = current_module->getContext()->getIntType();
+    left = type_conversion(left->get_value_return_type(), value_return_type, left);
+    right = type_conversion(right->get_value_return_type(), value_return_type, right);
     return new BinaryInstruction(value_return_type, node.op->getType(),
         left, right, current_basic_block);
 }
@@ -136,13 +128,16 @@ ValuePtr Visitor::visit_mul_exp(MulExp &node, std::shared_ptr<SymType> &type) {
     type = l_type->isConst() ? r_type->evaluate() : l_type->evaluate();
 
     //CONSTANT INFERENCE
-    if (type->isConst()) {
-        auto constant_l = dynamic_cast<ConstantPtr>(left);
-        auto constant_r = dynamic_cast<ConstantPtr>(right);
+    //CONSTANT INFERENCE
+    auto constant_l = dynamic_cast<ConstantPtr>(left);
+    auto constant_r = dynamic_cast<ConstantPtr>(right);
+    if (constant_l && constant_r) {
         return Constant::merge(constant_l, constant_r, node.op->getType());
     }
 
     auto value_return_type = current_module->getContext()->getIntType();
+    left = type_conversion(left->get_value_return_type(), value_return_type, left);
+    right = type_conversion(right->get_value_return_type(), value_return_type, right);
     return new BinaryInstruction(value_return_type, node.op->getType(),
         left, right, current_basic_block);
 }
@@ -154,9 +149,10 @@ ValuePtr Visitor::visit_unary_exp(UnaryExp &node, std::shared_ptr<SymType> &type
         // current_basic_block = new BasicBlock(current_module->getContext()->getVoidType(),
         //     current_basic_block->get_function());
         //TODO HOW TO GO BACK??
-        //TODO NEED TO CREATE A BB?
-        call_value = type_conversion(call_value->get_value_return_type(),
-                current_module->getContext()->getIntType(), call_value);
+        //NEED TO CREATE A BB? NO NEED
+        //DO NOT TYPE CONVERT HERE TODO
+        // call_value = type_conversion(call_value->get_value_return_type(),
+        //         current_module->getContext()->getIntType(), call_value);
         return call_value;
     }
     if (std::holds_alternative<OpUnaryExp>(node)) {
@@ -166,6 +162,8 @@ ValuePtr Visitor::visit_unary_exp(UnaryExp &node, std::shared_ptr<SymType> &type
             return new Constant(-dynamic_cast<ConstantPtr>(unary)->get_value(), current_module->getContext()->getIntType());
         }
         if (!(*unop->unary_op->op_token == TokenType::PLUS)) {
+            unary = type_conversion(unary->get_value_return_type(),
+                current_module->getContext()->getIntType(), unary);
             return new UnaryOpInstruction(current_module->getContext()->getIntType(),
                                           unop->unary_op->op_token->getType(), unary, current_basic_block);
         }
@@ -236,6 +234,9 @@ ValuePtr Visitor::visit_call_exp(CallExp &node, std::shared_ptr<SymType> &type) 
                     errors.emplace_back('e', node.identifier->getLine());
                     return new Constant(0, current_module->getContext()->getIntType());
                 }
+                value = type_conversion(value->get_value_return_type(),
+                    dynamic_cast<FunctionPtr>(symbol->get_addr())->get_arg_return_type(i),
+                    value);
                 values.push_back(value);
                 i++;
             }
@@ -358,6 +359,8 @@ void Visitor::init_local_object(ValuePtr value, std::shared_ptr<Symbol> symbol,
                 //TODO BRACEDCONSTEXP 也有可能
                 return;
             }
+            init = type_conversion(init->get_value_return_type(),
+                     dynamic_cast<PointerTypePtr>(value->get_value_return_type())->get_referenced_type(), init);
             new StoreInstruction(init, value, current_basic_block);
             break;
         }
@@ -376,6 +379,8 @@ void Visitor::init_local_object(ValuePtr value, std::shared_ptr<Symbol> symbol,
             for (auto &exp : const_exps) {
                 auto init_val = visit_add_exp(*exp->add_exp, init_type);
                 auto addr = new GetElementPtrInstruction(value, new Constant(i, current_module->getContext()->getIntType()), current_basic_block);
+                init_val = type_conversion(init_val->get_value_return_type(),
+                    dynamic_cast<PointerTypePtr>(addr->get_value_return_type())->get_referenced_type(), init_val);
                 new StoreInstruction(init_val, addr, current_basic_block);
                 i++;
             }
@@ -659,6 +664,7 @@ void Visitor::visit_printf_stmt(PrintfStmt &node) {
             case 'c': {
                 auto out = type_conversion(value->get_value_return_type(),
                    current_module->getContext()->getCharType(), value);
+                out = new ZextInstruction(out, current_basic_block);
                 new OutputInstruction(out, current_basic_block);
                 break;
             }
@@ -712,10 +718,12 @@ std::string Visitor::get_string_prefix(int &begin, std::string &str) {
 void Visitor::putstr(int &begin, std::string &string) {
     auto string_prefix = get_string_prefix(begin, string);
     if (!string_prefix.empty()) {
-        auto str_item = new GlobalValue(current_module->getContext()->getArrayType(
+        auto str_item_addr = new GlobalValue(current_module->getContext()->getArrayType(
             current_module->getContext()->getCharType(), string_prefix.size() + 1), get_string_name());
-        str_item->set_string(string_prefix);
+        str_item_addr->set_string(string_prefix);
         //ALLOCA CHAR ARRAY
+        auto str_item = new GetElementPtrInstruction(str_item_addr, new Constant(0, current_module->getContext()->getIntType()),
+            current_basic_block);
         new OutputInstruction(str_item, current_basic_block);
     }
 }
@@ -775,16 +783,17 @@ ValuePtr Visitor::visit_l_val(LVal &node, std::shared_ptr<SymType> &type) {
                     std::dynamic_pointer_cast<ArrayType>(symbol->get_type());
                 type = array_type->element_type();
 
-                //TODO REDO
-                //TODO AN ALLOCATED ARRAY IS THE VALUE, NOT ADDR
-                // auto pointer_val =  new LoadInstruction(symbol->get_addr(), current_basic_block);
+                //OBJECT * -> OBJECT_ELETYPE*
                 auto addr = new GetElementPtrInstruction(pointer_val, offset, current_basic_block);
-                auto l_val =  new LoadInstruction(addr, current_basic_block);
-                return type_conversion(l_val->get_value_return_type(),
-                    current_module->getContext()->getIntType(), l_val);
+                return new LoadInstruction(addr, current_basic_block);
+                //TODO DO NOT TYPE CONVERT HERE
+                // return type_conversion(l_val->get_value_return_type(),
+                //     current_module->getContext()->getIntType(), l_val);
                 //on the right, load value
             }
-            return pointer_val;
+            return new GetElementPtrInstruction(pointer_val,
+                new Constant(0, current_module->getContext()->getIntType()), current_basic_block);
+            //TODO 冗余
             //on the right, return the addr
         }
 
@@ -793,9 +802,10 @@ ValuePtr Visitor::visit_l_val(LVal &node, std::shared_ptr<SymType> &type) {
             return symbol->get_value();
         }
         //IF NOT, LOAD THE VALUE
-        auto l_val =  new LoadInstruction(symbol->get_addr(), current_basic_block);
-        return type_conversion(l_val->get_value_return_type(),
-            current_module->getContext()->getIntType(), l_val);
+        return new LoadInstruction(symbol->get_addr(), current_basic_block);
+        //TODO DO NOT TYPE CONVERT HERE
+        // return type_conversion(l_val->get_value_return_type(),
+        //     current_module->getContext()->getIntType(), l_val);
         //scalar type, load the value;
     }
     errors.emplace_back('c', node.identifier->getLine());
@@ -842,6 +852,8 @@ void Visitor::visit_func(FuncDef &node) {
     const auto func_return_info =
         func_type->evaluate()->isVoid() ? BLOCK_WITHOUT_RETURN : BLOCK_WITH_RETURN;
     visit_block(*node.block, func_return_info, false);
+
+    current_basic_block->pad();
 
     //5. pop scope
     current_sym_tab = current_sym_tab->pop_scope();

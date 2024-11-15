@@ -7,9 +7,9 @@
 
 #include <cstdint>
 
+#include "../llvm.h"
 #include"value.h"
 #include "../valueReturnType.h"
-
 
 enum class ConstantOp {
     ADD, SUB, MUL, DIV, MOD, 

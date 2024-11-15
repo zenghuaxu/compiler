@@ -26,7 +26,7 @@ class Function:public Value{
 
     void insert_parameter(ArgumentPtr arg) {
         args.push_back(arg);
-        arg->set_id(++current_object_id);
+        arg->set_id(current_object_id++);
     }
 
     void insert_block(BasicBlockPtr block) {
@@ -39,6 +39,10 @@ class Function:public Value{
 
     std::string get_name() {
         return name;
+    }
+
+    ValueReturnTypePtr get_arg_return_type(int index) {
+        return args.at(index)->get_value_return_type();
     }
 
     private:

@@ -28,7 +28,7 @@ BinaryInstruction::BinaryInstruction(ValueReturnTypePtr return_type, TokenType o
 }
 
 AllocaInstruction::AllocaInstruction(ValueReturnTypePtr return_type, BasicBlockPtr basic_block):
-        Instruction(return_type->getContext()->toPointerType(return_type), ValueType::AllocaInst, basic_block) {
+        Instruction(return_type->getContext()->getPointerType(return_type), ValueType::AllocaInst, basic_block) {
     return_type->getContext()->SaveValue<AllocaInstruction>(this);
     object_type = return_type;
 }
@@ -89,4 +89,20 @@ StoreInstruction::StoreInstruction(ValuePtr value, ValuePtr addr, BasicBlockPtr 
             , ValueType::StoreInst, basic_block) {
     this->add_use(new Use(this, value));
     this->add_use(new Use(this, addr));
+}
+
+OutputInstruction::OutputInstruction(ValuePtr value, BasicBlockPtr  basic_block):
+        Instruction(value->get_value_return_type()->getContext()->getVoidType(),
+            ValueType::OutputInst, basic_block) {
+    value_return_type = value->get_value_return_type();
+    this->add_use(new Use(this, value));
+}
+
+GetElementPtrInstruction::GetElementPtrInstruction(ValuePtr base, ValuePtr offset, BasicBlockPtr basic_block):
+    Instruction(base->get_value_return_type()->getContext()
+    ->getPointerType(dynamic_cast<PointerTypePtr>(base->get_value_return_type())
+    ->get_referenced_type()->get_ele_type()), ValueType::GetElementInst, basic_block) {
+    right_val = base->get_value_return_type();
+    this->add_use(new Use(this, base));
+    this->add_use(new Use(this, offset));
 }

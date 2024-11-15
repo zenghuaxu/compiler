@@ -16,6 +16,8 @@ class BasicBlock: public User{
 
     void print(std::ostream &out) override;
 
+    void pad();
+
     void add_inst(InstructionPtr inst) {
         auto use = new Use(this, reinterpret_cast<ValuePtr>(inst));
         add_use(use);
@@ -32,10 +34,11 @@ class BasicBlock: public User{
 
     ~BasicBlock() override = default;
 
-    private:
+private:
     FunctionPtr function;
     std::vector<BasicBlockPtr> goto_basic_blocks;
     std::vector<BasicBlockPtr> father_basic_blocks;
+    unsigned int id;
 
     void insert_father(BasicBlockPtr basic_block) {
         father_basic_blocks.push_back(basic_block);

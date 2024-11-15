@@ -13,16 +13,16 @@
 
 
 const std::unordered_map<int, std::string> value_to_char = {
-    {7, "\\a"},
-    {8, "\\b"},
-    {9, "\\c"},
-    {10, "\\n"},
-    {11, "\\v"},
-    {12, "\\f"},
-    {34, "\\\""},
-    {39, "\\'"},
+    {7, "\\07"},
+    {8, "\\08"},
+    {9, "\\09"},
+    {10, "\\0A"},
+    {11, "\\0B"},
+    {12, "\\0C"},
+    {34, "\\22"},
+    {39, "\'"},
     { 92, "\\\\"},
-    {0, "\\0"},
+    {0, "\\00"},
 };
 
 class GlobalValue:public Value {
@@ -76,7 +76,7 @@ class GlobalValue:public Value {
                 out << "]";
             }
             else {
-                out << "\"";
+                out << "c\"";
                 print_str(out);
                 for (int i = 0; i < type->get_size() - init_string.size(); i++) {
                     out << "\\00";

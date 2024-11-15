@@ -178,7 +178,9 @@ class ReturnInstruction: public Instruction {
 public:
     ReturnInstruction(ValueReturnTypePtr return_type, FunctionPtr function, ValuePtr ret_val, BasicBlockPtr basic_block):
         Instruction(return_type, ValueType::ReturnInst, basic_block) {
-        this->add_use(new Use(this, ret_val));
+        if (ret_val) {
+            this->add_use(new Use(this, ret_val));
+        }
         this->function = function;
     }
 
@@ -224,28 +226,31 @@ class StoreInstruction: public Instruction {
 
 class GetElementPtrInstruction: public Instruction {
     public:
-    GetElementPtrInstruction(ValuePtr base, ValuePtr offset, BasicBlockPtr basic_block):
-        Instruction(base->get_value_return_type(), ValueType::GetElementInst, basic_block) {
-        this->add_use(new Use(this, base));
-        this->add_use(new Use(this, offset));
-    }
+    GetElementPtrInstruction(ValuePtr base, ValuePtr offset, BasicBlockPtr basic_block);
 
     void print_full(std::ostream &out) override {
         print(out);
         out << " = getelementptr ";
-        assert(typeid(*get_value_return_type()) == typeid(PointerType));
-        auto ele_type = dynamic_cast<PointerTypePtr>(get_value_return_type())
+        assert(typeid(*right_val) == typeid(PointerType));
+        auto ele_type = dynamic_cast<PointerTypePtr>(right_val)
             ->get_referenced_type();
         ele_type->print(out);
         out << ", ";
-        print_value_return_type(out);
+        right_val->print(out);
         out << " ";
         auto base = use_list.at(0)->getValue();
         base->print(out);
         out << ", i32 ";
+        if (typeid(*dynamic_cast<PointerTypePtr>(right_val)
+            ->get_referenced_type()) == typeid(ValueArrayType)) {
+            out << "0, i32 ";
+        }
         auto offset = use_list.at(1)->getValue();
         offset->print(out);
     }
+
+    private:
+    ValueReturnTypePtr right_val;
 };
 
 class InputInstruction: public Instruction {
@@ -262,14 +267,11 @@ class InputInstruction: public Instruction {
 class OutputInstruction: public Instruction {
     public:
     //put char: char ;int: int :str: char*
-    OutputInstruction(ValuePtr value, BasicBlockPtr  basic_block):
-        Instruction(value->get_value_return_type(), ValueType::OutputInst, basic_block) {
-        this->add_use(new Use(this, value));
-    }
+    OutputInstruction(ValuePtr value, BasicBlockPtr basic_block);
 
     void print_full(std::ostream &out) override {
         out << "call void @put";
-        auto type = get_value_return_type();
+        auto type = value_return_type;
         auto value = use_list.at(0)->getValue();
         if (typeid(*type) == typeid(PointerType)) {
             out << "str(i8* ";
@@ -282,14 +284,14 @@ class OutputInstruction: public Instruction {
             out << ")";
         }
         else {
-            out << "char(i8 ";
+            out << "ch(i8 ";
             value->print(out);
             out << ")";
         }
     }
 
     private:
-    bool is_str;
+    ValueReturnTypePtr value_return_type;
 };
 
 #endif //INSTRUCTIONS_H

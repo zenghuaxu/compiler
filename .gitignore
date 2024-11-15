@@ -1,6 +1,6 @@
 /cmake-build-debug/
 .idea/
-/llvm_try/
+/test_llvm/
 *.zip
 *.txt
 !CMakeLists.txt
