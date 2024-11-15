@@ -93,10 +93,18 @@ StoreInstruction::StoreInstruction(ValuePtr value, ValuePtr addr, BasicBlockPtr 
 
 OutputInstruction::OutputInstruction(ValuePtr value, BasicBlockPtr  basic_block):
         Instruction(value->get_value_return_type()->getContext()->getVoidType(),
-            ValueType::OutputInst, basic_block) {
+            ValueType::OutputInst, basic_block), ch(false) {
     value_return_type = value->get_value_return_type();
     this->add_use(new Use(this, value));
 }
+
+OutputInstruction::OutputInstruction(ValuePtr value, BasicBlockPtr basic_block, bool ch):
+        Instruction(value->get_value_return_type()->getContext()->getVoidType(),
+            ValueType::OutputInst, basic_block), ch(ch) {
+    value_return_type = value->get_value_return_type();
+    this->add_use(new Use(this, value));
+}
+
 
 GetElementPtrInstruction::GetElementPtrInstruction(ValuePtr base, ValuePtr offset, BasicBlockPtr basic_block):
     Instruction(base->get_value_return_type()->getContext()

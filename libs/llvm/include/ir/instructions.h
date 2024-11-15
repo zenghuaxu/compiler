@@ -255,19 +255,28 @@ class GetElementPtrInstruction: public Instruction {
 
 class InputInstruction: public Instruction {
     public:
-    explicit InputInstruction(ValueReturnTypePtr return_type, BasicBlockPtr basic_block):
-        Instruction(return_type, ValueType::InputInst, basic_block) {}
+    explicit InputInstruction(ValueReturnTypePtr return_type, BasicBlockPtr basic_block, bool ch_type):
+        Instruction(return_type, ValueType::InputInst, basic_block), ch_type(ch_type) {}
 
     void print_full(std::ostream &out) override {
         print(out);
-        out << " = call i32 @getchar()";
+        if (ch_type) {
+            out << " = call i32 @getchar()";
+        }
+        else {
+            out << " = call i32 @getint()";
+        }
     }
+
+    private:
+    bool ch_type;
 };
 
 class OutputInstruction: public Instruction {
     public:
     //put char: char ;int: int :str: char*
     OutputInstruction(ValuePtr value, BasicBlockPtr basic_block);
+    OutputInstruction(ValuePtr value, BasicBlockPtr basic_block, bool ch);
 
     void print_full(std::ostream &out) override {
         out << "call void @put";
@@ -278,13 +287,13 @@ class OutputInstruction: public Instruction {
             value->print(out);
             out << ")";
         }
-        else if (typeid(*type) == typeid(IntType)) {
-            out << "int(i32 ";
+        else if (ch) {
+            out << "ch(i32 ";
             value->print(out);
             out << ")";
         }
         else {
-            out << "ch(i8 ";
+            out << "int(i32 ";
             value->print(out);
             out << ")";
         }
@@ -292,6 +301,7 @@ class OutputInstruction: public Instruction {
 
     private:
     ValueReturnTypePtr value_return_type;
+    bool ch;
 };
 
 #endif //INSTRUCTIONS_H

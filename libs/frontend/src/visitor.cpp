@@ -665,7 +665,7 @@ void Visitor::visit_printf_stmt(PrintfStmt &node) {
                 auto out = type_conversion(value->get_value_return_type(),
                    current_module->getContext()->getCharType(), value);
                 out = new ZextInstruction(out, current_basic_block);
-                new OutputInstruction(out, current_basic_block);
+                new OutputInstruction(out, current_basic_block, true);
                 break;
             }
             default: {
@@ -818,9 +818,9 @@ ValuePtr Visitor::visit_l_val_exp(LValExp &node) {
         auto exp = std::get_if<Exp>(&node);
         std::shared_ptr<SymType> type;
         return visit_add_exp(*exp->add_exp, type);
-        //TODO CHECK
     }
-    return new InputInstruction(current_module->getContext()->getIntType(), current_basic_block);
+    return new InputInstruction(current_module->getContext()->getIntType(), current_basic_block,
+        std::holds_alternative<GetCharExp>(node));
 }
 
 void Visitor::visit_func(FuncDef &node) {
