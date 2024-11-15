@@ -9,6 +9,9 @@
 #include "ast.h"
 #include "error.h"
 #include "symtable.h"
+#include "../../llvm/include/ir/basicBlock.h"
+#include "../../llvm/include/ir/module.h"
+#include "../../llvm/include/ir/function.h"
 
 #define BLOCK_WITH_RETURN 1
 #define BLOCK_WITHOUT_RETURN 0
@@ -20,10 +23,15 @@ class Visitor {
     std::shared_ptr<SymTable> current_sym_tab;
     std::vector<Error> &errors;
     int current_tab_id = 1;
+    int str_id = 0;
+    ModulePtr current_module;
+    BasicBlockPtr current_basic_block;
 
     public:
-    Visitor(std::vector<Error> &errors): errors(errors) {
+    explicit Visitor(std::vector<Error> &errors): errors(errors) {
         current_sym_tab = std::make_shared<SymTable>();
+        current_module = std::make_shared<Module>();
+        current_basic_block = nullptr;
         #ifdef SYMTABLE_
         sym_tables.push_back(current_sym_tab);
         #endif
@@ -36,9 +44,14 @@ class Visitor {
         #endif
     }
 
-    void visit_number(Number &node);
+    void new_basic_block(FunctionPtr function) {
+        current_basic_block = new BasicBlock(current_module->getContext()->getVoidType(), function);
+        function->insert_block(current_basic_block);
+    }
 
-    void visit_character(Character &node);
+    ValuePtr visit_number(Number &node);
+
+    ValuePtr visit_character(Character &node);
 
     void visit_l_or_exp(LOrExp &node);
 
@@ -48,28 +61,56 @@ class Visitor {
 
     void visit_rel_exp(RelExp &node);
 
-    void visit_add_exp(AddExp &node, std::shared_ptr<SymType> &type);
+    ValuePtr type_conversion(std::shared_ptr<SymType> &origin, const std::shared_ptr<SymType>& target, ValuePtr &value);
 
-    void visit_mul_exp(MulExp &node, std::shared_ptr<SymType> &type);
+    ValuePtr type_conversion(ValueReturnTypePtr origin, ValueReturnTypePtr target, ValuePtr value);
 
-    void visit_unary_exp(UnaryExp &node, std::shared_ptr<SymType> &type);
+    ValuePtr construct_binary_inst(ValuePtr left, ValuePtr right, std::shared_ptr<SymType> &type);
 
-    void visit_primary_exp(PrimaryExp &node, std::shared_ptr<SymType> &type);
+    ValuePtr visit_add_exp(AddExp &node, std::shared_ptr<SymType> &type);
 
-    void visit_call_exp(CallExp &node, std::shared_ptr<SymType> &type);
+    ValuePtr visit_mul_exp(MulExp &node, std::shared_ptr<SymType> &type);
+
+    ValuePtr visit_unary_exp(UnaryExp &node, std::shared_ptr<SymType> &type);
+
+    ValuePtr visit_primary_exp(PrimaryExp &node, std::shared_ptr<SymType> &type);
+
+    ValuePtr visit_call_exp(CallExp &node, std::shared_ptr<SymType> &type);
 
     void visit(CompUnit &node);
 
-    void visit_decl(Decl &node);
+    void visit_decl(Decl &node, bool isGlobal);
+
+    ValuePtr allocation(std::shared_ptr<SymType> type, bool isGlobal, bool isConst, std::string ident);
+
+    template<class T>
+    void init_global_object(ValuePtr value, std::shared_ptr<Symbol> symbol, T &const_exps, std::string string_const);
+
+    template<class T>
+    void init_global_object(ValuePtr value, T &const_exps, std::string string_const);
+
+    template<class T1, class T2>
+    void init_local_object(ValuePtr value, std::shared_ptr<Symbol> symbol, T1 type, T2 &const_exps,
+                           std::string string_const);
+
+    template<class T1, class T2>
+    void init_local_object(ValuePtr value, std::unique_ptr<Symbol> symbol, T1 type, T2 &const_exps,
+                           std::string string_const);
+
+    template<class T1, class T2>
+    void init_local_object(ValuePtr value, T1 type, T2 &const_exps, std::string string_const);
 
     void print_symbol(std::ostream &out);
 
+    void print_llvm(std::ostream &out);
+
+    std::string get_string_name();
+
 private:
-    void visit_decl(Decl &node) const;
 
-    void visit_const_def(ConstDef &node, const std::shared_ptr<BasicType>& basic_type);
+    void visit_const_def(ConstDef &node, const std::shared_ptr<BasicType> &basic_type, bool isGlobal);
 
-    void visit_var_def(VarDef &node, const std::shared_ptr<BasicType>& basic_type);
+    void visit_var_def(VarDef &node, const std::shared_ptr<BasicType> &basic_type, bool isGlobal);
 
     void visit_stmt(Stmt &node, int if_return, bool if_for);
 
@@ -95,21 +136,21 @@ private:
 
     void visit_printf_stmt(PrintfStmt &node);
 
-    int visit_str(const std::string &str);
+    static std::vector<bool> visit_str(const std::string &str);
 
-    void visit_l_val_with_no_evaluate(LVal &node, std::shared_ptr<SymType> &l_type);
+    static std::string get_string_prefix(int &begin, std::string &str);
 
-    void visit_l_val(LVal &node, std::shared_ptr<SymType> &type);
+    void putstr(int &begin, std::string &string);
 
-    void visit_l_val_exp(LValExp &node);
+    ValuePtr visit_l_val_with_no_evaluate(LVal &node, std::shared_ptr<SymType> &l_type);
+
+    ValuePtr visit_l_val(LVal &node, std::shared_ptr<SymType> &type);
+
+    ValuePtr visit_l_val_exp(LValExp &node);
 
     void visit_func(FuncDef &node);
 
     void visit_func_f_params(FuncFParams &node, const std::shared_ptr<Symbol> &symbol);
-
-    void visit_return_block(Block &node);
-
-    void visit_non_return_block(Block &node);
 
     void visit_block(Block &node, int if_return, bool if_for);
 

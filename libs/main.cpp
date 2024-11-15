@@ -59,5 +59,10 @@ int main() {
     }
     err.close();
 
+    #ifdef LLVM_IR
+    OUTPUT_OPEN(output, llvm_ir.txt);
+    visitor.print_llvm(output);
+    #endif
+
     return 0;
 }

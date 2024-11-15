@@ -5,6 +5,8 @@
 #ifndef AST_H
 #define AST_H
 
+#include <assert.h>
+#include <unordered_map>
 #include <vector>
 #include <variant>
 #include <bits/unique_ptr.h>
@@ -33,6 +35,7 @@ struct Character : Node {
     std::unique_ptr<Token> token;
 
     void print(std::ostream &out) override;
+    int get_value();
 };
 
 struct LVal;
@@ -351,5 +354,45 @@ struct CompUnit : Node {
 
     void print(std::ostream &out) override;
 };
+
+const std::unordered_map<std::string, int> char_to_value = {
+    {"\\a", 7},
+    {"\\b", 8},
+    {"\\t", 9},
+    {"\\n", 10},
+    {"\\v", 11},
+    {"\\f", 12},
+    {"\\\"", 34},
+    {"\\'", 39},
+    {"\\\\", 92},
+    {"\\0", 0},
+};
+
+inline int Character::get_value() {
+    auto content = token->getContent();
+    auto ch = content[1];
+    if (ch != '\\') {
+        assert(std::size(content) == 3);
+        return content[1];
+    }
+    assert(std::size(content) > 2);
+    std::string str = content.substr(1, content.size() - 2);
+    assert(char_to_value.find(str) != char_to_value.end());
+    return char_to_value.at(str);
+}
+
+inline std::vector<int> split_to_int(const std::string& str) {
+    std::vector<int> result;
+    for (int i = 1 ; i < str.size() - 1; i++) {
+        if (str[i] == '\\') {
+            result.push_back(char_to_value.at(str.substr(i, 2)));
+            i++;
+        }
+        else {
+            result.push_back(str.at(i));
+        }
+    }
+    return result;
+}
 
 #endif //AST_H

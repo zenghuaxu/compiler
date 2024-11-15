@@ -5,6 +5,7 @@
 #ifndef SYMTABLE_H
 #define SYMTABLE_H
 #include <cassert>
+#include <complex>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -12,6 +13,8 @@
 
 #include "../../include/configure.h"
 #include "token.h"
+#include "../../llvm/include/llvm.h"
+#include "../../llvm/include/llvmContext.h"
 
 class SymType {
     public:
@@ -23,6 +26,8 @@ class SymType {
     virtual std::shared_ptr<SymType> evaluate () = 0;
     virtual bool isConst() = 0;
     virtual bool isVoid() = 0;
+    virtual bool isInt() = 0;
+    virtual ValueReturnTypePtr toValueType(LLVMContextPtr context) = 0;
     virtual void print(std::ostream &out) = 0;
 };
 
@@ -63,8 +68,8 @@ class BasicType final : public SymType {
     }
 
     std::shared_ptr<SymType> evaluate() override {
-        return std::make_shared<BasicType>
-        (false, type == void_type ? void_type : int_type);
+        return std::make_shared<BasicType>(isConst(), int_type);
+        //MAINTAIN THE ATTRIBUTE OF ISCONSTANT, CONVERT TO INT
     }
 
     bool isConst() override {
@@ -86,12 +91,30 @@ class BasicType final : public SymType {
         return type == void_type;
     }
 
+    bool isInt() override {
+        return type == int_type;
+    }
+
     bool operator==(std::shared_ptr<SymType> other) override {
         if (typeid(*other) != typeid(BasicType)) {
             return false;
         }
         auto basic = std::dynamic_pointer_cast<BasicType>(other);
-        return type == basic->type && constant_obj == basic->constant_obj;
+        return type == basic->type;
+        //TODO ONLY TYPE THE SAME, CONSTANT ATTRIBUTE NOT
+    }
+
+    basic_type get_basic_type() {
+        return type;
+    }
+
+    ValueReturnTypePtr toValueType(LLVMContextPtr context) override {
+        switch (type) {
+            case void_type: return context->getVoidType();
+            case int_type: return context->getIntType();
+            case char_type: return context->getCharType();
+        }
+        return nullptr;
     }
 };
 
@@ -136,9 +159,21 @@ class ArrayType final : public SymType {
         return false;
     }
 
+    bool isInt() override {
+        return false;
+    }
+
     void print(std::ostream &out) override {
         _element_type->print(out);
         out << "Array";
+    }
+
+    ValueReturnTypePtr toValueType(LLVMContextPtr context) override {
+        return context->getArrayType(_element_type->toValueType(context), _size);
+    }
+
+    unsigned int get_size() {
+        return _size;
     }
 };
 
@@ -182,8 +217,27 @@ class FunctionType : public SymType {
         return false;
     }
 
+    bool isInt() override {
+        return false;
+    }
+
     std::vector<std::shared_ptr<SymType>> get_params() {
         return _params;
+    }
+
+    ValueReturnTypePtr get_return_type(LLVMContextPtr context) {
+        assert(typeid(*_return_type) == typeid(BasicType));
+        auto type = std::dynamic_pointer_cast<BasicType>(_return_type);
+        switch (type->get_basic_type()) {
+            case BasicType::void_type: return context->getVoidType();
+            case BasicType::int_type: return context->getIntType();
+            case BasicType::char_type: return context->getCharType();
+        }
+        return nullptr;
+    }
+
+    ValueReturnTypePtr toValueType(LLVMContextPtr context) override {
+        return _return_type->toValueType(context);
     }
 };
 
@@ -193,10 +247,15 @@ class Symbol {
     int line;
     unsigned int id;
     unsigned int table_id;
+    ValuePtr addr_addr;
+    ValuePtr object_addr;
+    ConstantPtr const_value;
 
     public:
     Symbol(std::shared_ptr<SymType> type, std::string identifier, int line, unsigned int id):
-    type(std::move(type)), identifier(std::move(identifier)), line(line) {};
+    type(std::move(type)), identifier(std::move(identifier)), line(line),
+    addr_addr(nullptr), object_addr(nullptr), const_value(nullptr),
+    id(id) {};
 
     [[nodiscard]] std::string get_identifier() const {
         return identifier;
@@ -206,6 +265,29 @@ class Symbol {
         return type;
     }
 
+    void insert_addr_addr(ValuePtr addr) {
+        addr_addr = addr;
+    }
+
+    ValuePtr get_addr_addr() {
+        return addr_addr;
+    }
+
+    void insert_addr(ValuePtr addr) {
+        object_addr = addr;
+    }
+
+    ValuePtr get_addr() {
+        return object_addr;
+    }
+
+    void insert_value(ConstantPtr value) {
+        const_value = value;
+    }
+
+    ConstantPtr get_value() {
+        return const_value;
+    }
     void insert_parameter(const std::shared_ptr<SymType>& type) {
         #ifdef DEBUG_SEMANTIC
         std::cout << typeid(*this->type).name() << std::endl;
