@@ -34,13 +34,14 @@ void Function::print(std::ostream &out) {
     out << ") {" << std::endl;
 
     mark_id();
-    auto tag = blocks.size() > 1;
-    for (int i = 0; i < blocks.size(); i++) {
-        if (tag) {
-            out << i + 1;
-            out << ":\n";
-        }
-        blocks.at(i)->print(out);
+    for (auto & block : blocks) {
+        block->print_full(out);
     }
     out << "}" << std::endl;
+}
+
+void Function::pad() {//TODO INEFFICIENT
+    for (auto block : blocks) {
+        block->pad();
+    }
 }

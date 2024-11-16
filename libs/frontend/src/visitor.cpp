@@ -16,7 +16,6 @@
 template <class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
 template <class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 
-
 ValuePtr Visitor::visit_number(Number &node) {
     auto content = node.token->getContent();
     int num = std::stoi(content);
@@ -29,33 +28,70 @@ ValuePtr Visitor::visit_character(Character &node) {
     return new Constant(ch, current_module->getContext()->getIntType());
 }
 
-void Visitor::visit_l_or_exp(LOrExp &node) {
-    if (node.lhs) {
-        visit_l_or_exp(*node.lhs);
+void Visitor::visit_l_or_exp(LOrExp &node, BasicBlockPtr true_block, BasicBlockPtr false_block) {
+    if (!node.lhs) {
+        visit_l_and_exp(*node.rhs, true_block, false_block);
+        return;
     }
-    visit_l_and_exp(*node.rhs);
+    auto rhs_bb = new_basic_block(current_basic_block->get_function());
+    visit_l_or_exp(*node.lhs, true_block, rhs_bb);
+    current_basic_block = rhs_bb;
+    visit_l_and_exp(*node.rhs, true_block, false_block);
 }
 
-void Visitor::visit_l_and_exp(LAndExp &node) {
-    if (node.lhs) {
-        visit_l_and_exp(*node.lhs);
+void Visitor::visit_l_and_exp(LAndExp &node, BasicBlockPtr true_block, BasicBlockPtr false_block) {
+    if (!node.lhs) {
+        auto condition = visit_eq_exp(*node.rhs);
+
+        if (typeid(*condition->get_value_return_type()) != typeid(BitType)) {
+            condition = new CompareInstruction(current_module->getContext()->getBitType(), TokenType::NEQ,
+                condition, new Constant(0, condition->get_value_return_type()),
+                current_basic_block);
+        } //to bittype
+        new BranchInstruction(condition, true_block, false_block, current_basic_block);
+        return;
     }
-    visit_eq_exp(*node.rhs);
+    auto rhs_bb = new_basic_block(current_basic_block->get_function());
+    visit_l_and_exp(*node.lhs, rhs_bb, false_block);
+    current_basic_block = rhs_bb;
+    auto condition = visit_eq_exp(*node.rhs);
+    if (typeid(*condition->get_value_return_type()) != typeid(BitType)) {
+        condition = new CompareInstruction(current_module->getContext()->getBitType(), TokenType::NEQ,
+            condition, new Constant(0, condition->get_value_return_type()),
+            current_basic_block);
+    } //to bittype
+    new BranchInstruction(condition, true_block, false_block, current_basic_block);
 }
 
-void Visitor::visit_eq_exp(EqExp &node) {
-    if (node.lhs) {
-        visit_eq_exp(*node.lhs);
+ValuePtr Visitor::visit_eq_exp(EqExp &node) {
+    if (!node.lhs) {
+        return visit_rel_exp(*node.rhs);
     }
-    visit_rel_exp(*node.rhs);
+    auto left = visit_eq_exp(*node.lhs);
+    auto right = visit_rel_exp(*node.rhs);
+
+    left = type_conversion(left->get_value_return_type(),
+    current_module->getContext()->getIntType(), left);
+    right = type_conversion(right->get_value_return_type(),
+        current_module->getContext()->getIntType(), right);
+    return new CompareInstruction(current_module->getContext()->getBitType(),
+        node.op->getType(), left, right, current_basic_block);
 }
 
-void Visitor::visit_rel_exp(RelExp &node) {
-    if (node.lhs) {
-        visit_rel_exp(*node.lhs);
-    }
+ValuePtr Visitor::visit_rel_exp(RelExp &node) {
     std::shared_ptr<SymType> type;
-    visit_add_exp(*node.rhs, type);
+    if (!node.lhs) {
+        return visit_add_exp(*node.rhs, type);
+    }
+    auto left = visit_rel_exp(*node.lhs);
+    auto right = visit_add_exp(*node.rhs, type);
+
+    left = type_conversion(left->get_value_return_type(),
+        current_module->getContext()->getIntType(), left);
+    right = type_conversion(right->get_value_return_type(),
+        current_module->getContext()->getIntType(), right);
+    return new CompareInstruction(current_module->getContext()->getBitType(),
+        node.op->getType(), left, right, current_basic_block);
 }
 
 /**
@@ -66,13 +102,14 @@ void Visitor::visit_rel_exp(RelExp &node) {
  * @return instruction
  * NOTICE:: CHAR->INT ZERO EXTENSION?
  */
-ValuePtr Visitor::type_conversion(ValueReturnTypePtr origin, ValueReturnTypePtr target, ValuePtr value) {
+ValuePtr Visitor::type_conversion(ValueReturnTypePtr origin,
+    ValueReturnTypePtr target, ValuePtr value) {
     if (origin != target) {
         if (typeid(*value) == typeid(Constant)) {
             return new Constant(dynamic_cast<ConstantPtr>(value)->get_value(), target);
         }
-        //TODO MORE COMPLICATED accommodation
-        if (target->isInt()) {
+        //TODO CHECK OVERLOAD
+        if (*origin < *target) {
             return new ZextInstruction(value, current_basic_block);
         }
         return new TruncInstruction(value, current_basic_block);
@@ -159,12 +196,20 @@ ValuePtr Visitor::visit_unary_exp(UnaryExp &node, std::shared_ptr<SymType> &type
         const auto unop = std::get_if<OpUnaryExp>(&node);
         auto unary = visit_unary_exp(*unop->unary_exp, type);
         if (typeid(*unary) == typeid(Constant)) {
-            return new Constant(-dynamic_cast<ConstantPtr>(unary)->get_value(), current_module->getContext()->getIntType());
+            auto value = dynamic_cast<ConstantPtr>(unary)->get_value();
+            if ((*unop->unary_op->op_token) == TokenType::MINU) {
+                return new Constant(-value, current_module->getContext()->getIntType());
+            }
+            if ((*unop->unary_op->op_token) == TokenType::NOT) {
+                return new Constant(!value, current_module->getContext()->getIntType());
+            }
+            return unary;
         }
-        if (!(*unop->unary_op->op_token == TokenType::PLUS)) {
+        auto token = *unop->unary_op->op_token;
+        if (!(token == TokenType::PLUS)) {
             unary = type_conversion(unary->get_value_return_type(),
                 current_module->getContext()->getIntType(), unary);
-            return new UnaryOpInstruction(current_module->getContext()->getIntType(),
+            return new UnaryOpInstruction(token == TokenType::MINU ? current_module->getContext()->getIntType() : current_module->getContext()->getBitType(),
                                           unop->unary_op->op_token->getType(), unary, current_basic_block);
         }
         return unary;
@@ -508,28 +553,30 @@ void Visitor::visit_var_def(VarDef &node,
     }
 }
 
-void Visitor::visit_stmt(Stmt &node, int if_return, bool if_for) {
+void Visitor::visit_stmt(Stmt &node, int if_return, bool if_for, BasicBlockPtr break_return, BasicBlockPtr continue_return) {
     std::visit(overloaded{
             [this](LValWrapStmt &node) { visit_l_val_wrap_stmt(node);},
-            [this, if_return, if_for](IfStmt &node) {
-                visit_if_stmt(node, if_return, if_for);
+            [this, if_return, if_for, break_return, continue_return](IfStmt &node) {
+                auto out = new_basic_block(current_basic_block->get_function());
+                visit_if_stmt(node, if_return, if_for, break_return, continue_return, out);
             },
             [this, if_return, if_for](ForStmt &node) {
-                visit_for_stmt(node, if_return, if_for);
+                auto out = new_basic_block(current_basic_block->get_function());
+                visit_for_stmt(node, if_return, if_for, out);
             },
-            [this, if_for](BreakStmt &node) {
-                visit_break_stmt(node, if_for);
+            [this, if_for, break_return](BreakStmt &node) {
+                visit_break_stmt(node, if_for, break_return);
             },
-            [this, if_for](ContinueStmt &node) {
-                visit_continue_stmt(node, if_for);
+            [this, if_for, continue_return](ContinueStmt &node) {
+                visit_continue_stmt(node, if_for, continue_return);
             },
             [this, if_return](ReturnStmt &node) {
                 visit_return_stmt(node, if_return);
             },
             [this](PrintfStmt &node) { visit_printf_stmt(node);},
-            [this, if_return, if_for](Block &node) {
+            [this, if_return, if_for, break_return, continue_return](Block &node) {
                 push_table();
-                visit_block(node, if_return, if_for);
+                visit_block(node, if_return, if_for, break_return, continue_return);
                 current_sym_tab = current_sym_tab->pop_scope();
             },
     }, node);
@@ -578,51 +625,117 @@ void Visitor::visit_exp_stmt(ExpStmt &node) {
     }
 }
 
-void Visitor::visit_if_stmt(IfStmt &node, int if_return, bool if_for) {
-    if (node.cond) {
-        visit_l_or_exp(*node.cond->l_or_exp);
-    }
-    visit_stmt(*node.if_stmt, if_return, if_for);
+void Visitor::visit_if_stmt(IfStmt &node, int if_return, bool if_for,
+    BasicBlockPtr break_return, BasicBlockPtr continue_return,
+    BasicBlockPtr out) {
+    assert(node.cond);
+    auto if_body = new_basic_block(current_basic_block->get_function());
     if (node.else_stmt) {
-        visit_stmt(*node.else_stmt, if_return, if_for);
+        auto else_body = new_basic_block(current_basic_block->get_function());
+        visit_l_or_exp(*node.cond->l_or_exp, if_body, else_body);
+        current_basic_block = if_body;
+        visit_stmt(*node.if_stmt, if_return, if_for, break_return, continue_return);
+        if (current_basic_block->enable_pad()) {
+            new JumpInstruction(out, current_basic_block); //NOTICE: INSERT INTO IF_BODY
+        }
+        current_basic_block = else_body;
+        visit_stmt(*node.else_stmt, if_return, if_for, break_return, continue_return);
+        if (current_basic_block->enable_pad()) {
+            new JumpInstruction(out, current_basic_block);
+        }
     }
+    else {
+        visit_l_or_exp(*node.cond->l_or_exp, if_body, out);
+        current_basic_block = if_body;
+        visit_stmt(*node.if_stmt, if_return, if_for, break_return, continue_return);
+        if (current_basic_block->enable_pad()) {
+            new JumpInstruction(out, current_basic_block); //NOTICE: INSERT INTO IF_BODY
+        }
+    }
+    current_basic_block = out;
 }
 
-void Visitor::visit_for_stmt(ForStmt &node, int if_return, bool if_for) {
+void Visitor::visit_for_stmt(ForStmt &node, int if_return, bool if_for, BasicBlockPtr out) {
     if (node.init) {
         visit_for__stmt(*node.init);
     }
+    auto entrance_block = current_basic_block;
+    auto body_block = new_basic_block(current_basic_block->get_function());
+    BasicBlockPtr cond_block = nullptr;
+    current_basic_block = body_block;
     if (node.cond) {
-        visit_l_or_exp(*node.cond->l_or_exp);
+        cond_block = new_basic_block(current_basic_block->get_function()); //COND BLOCK;
+        if (entrance_block->enable_pad()) {
+            new JumpInstruction(cond_block, entrance_block);
+        }
+        current_basic_block = cond_block;
+        visit_l_or_exp(*node.cond->l_or_exp, body_block, out);
     }
+    else if (entrance_block->enable_pad()) {
+        new JumpInstruction(body_block, entrance_block);
+    }
+
+    auto return_block = current_basic_block;
+    auto loop_block = new_basic_block(current_basic_block->get_function());
+    //NOW IN LOOP STMT RETURN BLOCK
     if (node.loop_stmt) {
+        current_basic_block = loop_block;//LOOP BLOCK
         visit_for__stmt(*node.loop_stmt);
     }
+    new JumpInstruction(return_block, loop_block);
+
     assert(node.body_stmt);
-    visit_stmt(*node.body_stmt, if_return, true);
+    return_block = current_basic_block;
+    current_basic_block = body_block;
+    auto break_return = out;
+    auto continue_return = loop_block;
+
+    visit_stmt(*node.body_stmt, if_return, true, break_return, continue_return);
+    if (current_basic_block->enable_pad()) {
+        new JumpInstruction(return_block, current_basic_block);
+    }
+    current_basic_block = out;
 }
 
 void Visitor::visit_for__stmt(ForStmt_ &node) {
     std::shared_ptr<SymType> l_type, exp_type;
-    visit_l_val_with_no_evaluate(*node.l_val, l_type);
-    visit_add_exp(*node.exp->add_exp, exp_type);
+    auto designate = visit_l_val_with_no_evaluate(*node.l_val, l_type);
+    auto value = visit_add_exp(*node.exp->add_exp, exp_type);
 
     if (l_type->isConst()) {
         errors.emplace_back('h', node.l_val->identifier->getLine());
+        return;
     }
-    //TODO assign
+
+    if (designate) {
+        value = type_conversion(value->get_value_return_type(), dynamic_cast<PointerTypePtr>(
+            designate->get_value_return_type())->get_referenced_type(), value);
+        // if (designate->get_value_return_type() == current_module->getContext()->getCharType()) {
+        //     value = new TruncInstruction(value, current_basic_block);
+        // }
+        new StoreInstruction(value, designate, current_basic_block);
+        //THIS IS HEAD NODE TODO
+    }
 }
 
-void Visitor::visit_break_stmt(BreakStmt &node, bool if_for) {
+void Visitor::visit_break_stmt(BreakStmt &node, bool if_for, BasicBlockPtr return_block) {
     if (!if_for) {
         errors.emplace_back('m', node.line);
+        return;
     }
+    assert(return_block);
+    new JumpInstruction(return_block, current_basic_block);
+    current_basic_block = new_basic_block(current_basic_block->get_function());
 }
 
-void Visitor::visit_continue_stmt(ContinueStmt &node, bool if_for) {
+void Visitor::visit_continue_stmt(ContinueStmt &node, bool if_for, BasicBlockPtr return_block) {
     if (!if_for) {
         errors.emplace_back('m', node.line);
+        return;
     }
+    assert(return_block);
+    new JumpInstruction(return_block, current_basic_block);
+    current_basic_block = new_basic_block(current_basic_block->get_function());
 }
 
 void Visitor::visit_return_stmt(ReturnStmt &node, bool if_return) {
@@ -638,7 +751,7 @@ void Visitor::visit_return_stmt(ReturnStmt &node, bool if_return) {
     auto func = current_basic_block->get_function();
     ret_value =
         type_conversion(ret_value->get_value_return_type(), func->get_value_return_type(), ret_value);
-    new ReturnInstruction(func->get_value_return_type(), func, ret_value, current_basic_block);
+    new ReturnInstruction(current_module->getContext()->getVoidType(), func, ret_value, current_basic_block);
     //END OF BB
 }
 
@@ -843,7 +956,7 @@ void Visitor::visit_func(FuncDef &node) {
     auto func = new Function(return_type->toValueType(current_module->getContext()),
         false, func_ptr->get_identifier());//VALUE
     func_ptr->insert_addr(func);
-    new_basic_block(func);
+    current_basic_block = new_basic_block(func);
     if (node.func_f_params) {
         visit_func_f_params(*node.func_f_params, func_ptr);
     }
@@ -851,9 +964,9 @@ void Visitor::visit_func(FuncDef &node) {
     //4. visit block
     const auto func_return_info =
         func_type->evaluate()->isVoid() ? BLOCK_WITHOUT_RETURN : BLOCK_WITH_RETURN;
-    visit_block(*node.block, func_return_info, false);
+    visit_block(*node.block, func_return_info, false, nullptr, nullptr);
 
-    current_basic_block->pad();
+    func->pad();
 
     //5. pop scope
     current_sym_tab = current_sym_tab->pop_scope();
@@ -903,7 +1016,7 @@ void Visitor::visit_func_f_params
     }
 }
 
-void Visitor::visit_block(Block &node, int if_return, bool if_for) {
+void Visitor::visit_block(Block &node, int if_return, bool if_for, BasicBlockPtr break_return, BasicBlockPtr continue_return) {
     for (auto &item: node.block_items) {
         if (std::holds_alternative<Decl>(*item)) {
             const auto decl = std::get_if<Decl>(&*item);
@@ -911,7 +1024,7 @@ void Visitor::visit_block(Block &node, int if_return, bool if_for) {
         }
         else {
             const auto stmt = std::get_if<Stmt>(&*item);
-            visit_stmt(*stmt, if_return ? BLOCK_PLAIN : BLOCK_WITHOUT_RETURN, if_for);
+            visit_stmt(*stmt, if_return ? BLOCK_PLAIN : BLOCK_WITHOUT_RETURN, if_for, break_return, continue_return);
         }
     }
     //check return
@@ -931,8 +1044,8 @@ void Visitor::visit_block(Block &node, int if_return, bool if_for) {
 void Visitor::visit_main_func(MainFuncDef &node) {
     push_table();
     auto main_func = new Function(current_module->getContext()->getIntType(), true, "main");
-    new_basic_block(main_func);
-    visit_block(*node.block, BLOCK_WITH_RETURN, false);
+    current_basic_block = new_basic_block(main_func);
+    visit_block(*node.block, BLOCK_WITH_RETURN, false, nullptr,     nullptr);
     current_sym_tab = current_sym_tab->pop_scope();
 }
 

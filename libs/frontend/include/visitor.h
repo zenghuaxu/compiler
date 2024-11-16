@@ -44,22 +44,23 @@ class Visitor {
         #endif
     }
 
-    void new_basic_block(FunctionPtr function) {
-        current_basic_block = new BasicBlock(current_module->getContext()->getVoidType(), function);
-        function->insert_block(current_basic_block);
+    BasicBlockPtr new_basic_block(FunctionPtr function) {
+        auto block = new BasicBlock(current_module->getContext()->getVoidType(), function);
+        function->insert_block(block);
+        return block;
     }
 
     ValuePtr visit_number(Number &node);
 
     ValuePtr visit_character(Character &node);
 
-    void visit_l_or_exp(LOrExp &node);
+    void visit_l_or_exp(LOrExp &node, BasicBlockPtr true_block, BasicBlockPtr false_block);
 
-    void visit_l_and_exp(LAndExp &node);
+    void visit_l_and_exp(LAndExp &node, BasicBlockPtr true_block, BasicBlockPtr false_block);
 
-    void visit_eq_exp(EqExp &node);
+    ValuePtr visit_eq_exp(EqExp &node);
 
-    void visit_rel_exp(RelExp &node);
+    ValuePtr visit_rel_exp(RelExp &node);
 
     ValuePtr type_conversion(std::shared_ptr<SymType> &origin, const std::shared_ptr<SymType>& target, ValuePtr &value);
 
@@ -112,7 +113,7 @@ private:
 
     void visit_var_def(VarDef &node, const std::shared_ptr<BasicType> &basic_type, bool isGlobal);
 
-    void visit_stmt(Stmt &node, int if_return, bool if_for);
+    void visit_stmt(Stmt &node, int if_return, bool if_for, BasicBlockPtr break_return, BasicBlockPtr continue_return);
 
     void visit_l_val_wrap_stmt(LValWrapStmt &node);
 
@@ -122,15 +123,15 @@ private:
 
     void visit_exp_stmt(ExpStmt &node);
 
-    void visit_if_stmt(IfStmt &node, int if_return, bool if_for);
+    void visit_if_stmt(IfStmt &node, int if_return, bool if_for, BasicBlockPtr break_return, BasicBlockPtr continue_return, BasicBlockPtr out);
 
-    void visit_for_stmt(ForStmt &node, int if_return, bool if_for);
+    void visit_for_stmt(ForStmt &node, int if_return, bool if_for, BasicBlockPtr out);
 
     void visit_for__stmt(ForStmt_ &node);
 
-    void visit_break_stmt(BreakStmt &node, bool if_for);
+    void visit_break_stmt(BreakStmt &node, bool if_for, BasicBlockPtr return_block);
 
-    void visit_continue_stmt(ContinueStmt &node, bool if_for);
+    void visit_continue_stmt(ContinueStmt &node, bool if_for, BasicBlockPtr return_block);
 
     void visit_return_stmt(ReturnStmt &node, bool if_return);
 
@@ -152,7 +153,7 @@ private:
 
     void visit_func_f_params(FuncFParams &node, const std::shared_ptr<Symbol> &symbol);
 
-    void visit_block(Block &node, int if_return, bool if_for);
+    void visit_block(Block &node, int if_return, bool if_for, BasicBlockPtr break_return, BasicBlockPtr continue_return);
 
     void visit_main_func(MainFuncDef &node);
 };

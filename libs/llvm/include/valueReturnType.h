@@ -18,6 +18,9 @@ class ValueReturnType {
     virtual bool isInt() = 0;
     virtual void print(std::ostream &out) = 0;
     virtual ValueReturnTypePtr get_ele_type() = 0;
+    bool operator<(const ValueReturnType &other) const {
+        return type_id < other.type_id;
+    }
 
     protected:
     ValueReturnType(unsigned int type_id, LLVMContextPtr context):
@@ -26,6 +29,21 @@ class ValueReturnType {
     private:
     unsigned int type_id;
     LLVMContextPtr context;
+};
+
+class BitType: public ValueReturnType {
+    friend class LLVMContext;
+
+    public:
+    bool isInt() override { return false; }
+    void print(std::ostream &out) override {
+        out << "i1";
+    }
+    ValueReturnTypePtr get_ele_type() override { return this; }
+
+    protected:
+    BitType(unsigned int type_id, LLVMContextPtr context):
+        ValueReturnType(type_id, context) {}
 };
 
 class CharType : public ValueReturnType {

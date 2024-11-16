@@ -1,7 +1,6 @@
 //
 // Created by LENOVO on 2024/11/12.
 //
-
 #ifndef INSTRUCTIONS_H
 #define INSTRUCTIONS_H
 #include <unordered_map>
@@ -54,10 +53,20 @@ class UnaryOpInstruction: public Instruction {
     }
 
     void print_full(std::ostream &out) override {
-        //TODO JUST MUNUS, ELSE TO JUMP
-        print(out);
-        out << " = sub i32 0, ";
-        use_list.at(0)->getValue()->print(out);
+        switch (this->op) {
+            case UnaryOpType::NEG: {
+                print(out);
+                out << " = sub i32 0, ";
+                use_list.at(0)->getValue()->print(out);
+                break;
+            }
+            default: {
+                print(out);
+                out << " = icmp eq i32 0, ";
+                use_list.at(0)->getValue()->print(out);
+                break;
+            }
+        }
     }
 
     private:
@@ -108,6 +117,71 @@ class BinaryInstruction: public Instruction {
 
     private:
     BinaryOp op;
+};
+
+enum class CompOp {EQ, NE, SGT, SGE, SLT, SLE};
+
+inline std::unordered_map<TokenType, CompOp> tokentype_to_comp_op = {
+    {TokenType::EQL, CompOp::EQ},
+    {TokenType::NEQ, CompOp::NE},
+    {TokenType::GRE, CompOp::SGT},
+    {TokenType::GEQ, CompOp::SGE},
+    {TokenType::LSS, CompOp::SLT},
+    {TokenType::LEQ, CompOp::SLE},
+};
+
+inline std::unordered_map<CompOp, std::string> comp_op_to_string = {
+    {CompOp::EQ, "eq"},
+    {CompOp::NE, "ne"},
+    {CompOp::SGT, "sgt"},
+    {CompOp::SGE, "sge"},
+    {CompOp::SLT, "slt"},
+    {CompOp::SLE, "sle"},
+};
+
+class CompareInstruction: public Instruction {
+    public:
+    CompareInstruction(ValueReturnTypePtr return_type, TokenType op, ValuePtr lhs, ValuePtr rhs,
+                  BasicBlockPtr basic_block);
+
+    void print_full(std::ostream &out) override {
+        print(out);
+        out << " = icmp " << comp_op_to_string.at(op) <<" ";
+        comp_type->print(out);
+        out << " ";
+        use_list.at(0)->getValue()->print(out);
+        out << ", ";
+        use_list.at(1)->getValue()->print(out);
+    }
+
+    private:
+    CompOp op;
+    ValueReturnTypePtr comp_type;
+};
+
+class BranchInstruction: public Instruction {
+    public:
+    BranchInstruction(ValuePtr condition, BasicBlockPtr true_block, BasicBlockPtr false_block,
+        BasicBlockPtr current_block);
+
+    void print_full(std::ostream &out) override {
+        out << "br i1 ";
+        use_list.at(0)->getValue()->print(out);
+        out << ", label %";
+        use_list.at(1)->getValue()->print(out);
+        out << ", label %";
+        use_list.at(2)->getValue()->print(out);
+    }
+};
+
+class JumpInstruction:public Instruction {
+    public:
+    JumpInstruction(BasicBlockPtr jump_block, BasicBlockPtr current_block);
+
+    void print_full(std::ostream &out) override {
+        out << "br label %";
+        use_list.at(0)->getValue()->print(out);
+    }
 };
 
 class AllocaInstruction: public Instruction {

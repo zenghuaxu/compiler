@@ -27,6 +27,34 @@ BinaryInstruction::BinaryInstruction(ValueReturnTypePtr return_type, TokenType o
     return_type->getContext()->SaveValue<BinaryInstruction>(this);
 }
 
+CompareInstruction::CompareInstruction(ValueReturnTypePtr return_type, TokenType op,
+    ValuePtr lhs, ValuePtr rhs, BasicBlockPtr basic_block):
+    Instruction(return_type, ValueType::CompareInst, basic_block) {
+    try {this->op = tokentype_to_comp_op[op];} catch (std::invalid_argument& e) {std::cout << e.what() << '\n';}
+    this->add_use(new Use(this, lhs));
+    this->add_use(new Use(this, rhs));
+    comp_type = lhs->get_value_return_type();
+    return_type->getContext()->SaveValue<CompareInstruction>(this);
+}
+
+BranchInstruction::BranchInstruction(ValuePtr condition, BasicBlockPtr true_block, BasicBlockPtr false_block,
+    BasicBlockPtr current_block):
+    Instruction(condition->get_value_return_type()->getContext()->getVoidType(),
+        ValueType::BranchInst, current_block) {
+    this->add_use(new Use(this, condition));
+    this->add_use(new Use(this, true_block));
+    this->add_use(new Use(this, false_block));
+    current_block->insert_goto(true_block);
+    current_block->insert_goto(false_block);
+}
+
+JumpInstruction::JumpInstruction(BasicBlockPtr jump_block, BasicBlockPtr current_block):
+    Instruction(jump_block->get_value_return_type()->getContext()->getVoidType(),
+        ValueType::JumpInst, current_block) {
+    this->add_use(new Use(this, jump_block));
+    current_block->insert_goto(jump_block);
+}
+
 AllocaInstruction::AllocaInstruction(ValueReturnTypePtr return_type, BasicBlockPtr basic_block):
         Instruction(return_type->getContext()->getPointerType(return_type), ValueType::AllocaInst, basic_block) {
     return_type->getContext()->SaveValue<AllocaInstruction>(this);
@@ -66,13 +94,13 @@ void CallInstruction::print_full(std::ostream &out) {
 
 void ReturnInstruction::print_full(std::ostream &out) {
     out << "ret ";
-    if (get_value_return_type() !=
-        get_value_return_type()->getContext()->getVoidType()) {
+    if (function->get_value_return_type() !=
+        get_value_return_type()/*VOID*/) {
         auto value = use_list.at(0)->getValue();
         value->get_value_return_type()->print(out);
         out << " ";
         value->print(out);
-        }
+    }
     else {
         out << "void";
     }

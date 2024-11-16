@@ -37,12 +37,22 @@ class Function:public Value{
 
     void print(std::ostream &out) override;
 
+    void pad();
+
     std::string get_name() {
         return name;
     }
 
     ValueReturnTypePtr get_arg_return_type(int index) {
         return args.at(index)->get_value_return_type();
+    }
+
+    void delete_bb(BasicBlockPtr block) {
+        for (int i = 0; i < blocks.size(); i++) {
+            if (blocks[i] == block) {
+                blocks.erase(blocks.begin() + i);
+            }
+        }
     }
 
     private:

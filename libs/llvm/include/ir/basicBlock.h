@@ -16,7 +16,11 @@ class BasicBlock: public User{
 
     void print(std::ostream &out) override;
 
+    void print_full(std::ostream &out);
+
     void pad();
+
+    bool enable_pad();
 
     void add_inst(InstructionPtr inst) {
         auto use = new Use(this, reinterpret_cast<ValuePtr>(inst));
@@ -28,8 +32,28 @@ class BasicBlock: public User{
         basic_block->insert_father(this);
     }
 
+    void delete_goto(BasicBlockPtr basic_block) {
+        for (int i = 0; i < goto_basic_blocks.size(); i++) {
+            if (goto_basic_blocks[i] == basic_block) {
+                goto_basic_blocks.erase(goto_basic_blocks.begin() + i);
+            }
+        }
+    }
+
     FunctionPtr get_function() {
         return function;
+    }
+
+    bool empty() {
+        return use_list.empty();
+    }
+
+    void merge(BasicBlockPtr basic_block) {
+        for (auto father: father_basic_blocks) {
+            father->delete_goto(this);
+            father->insert_goto(basic_block);
+        }
+        delete this;
     }
 
     ~BasicBlock() override = default;
@@ -38,7 +62,7 @@ private:
     FunctionPtr function;
     std::vector<BasicBlockPtr> goto_basic_blocks;
     std::vector<BasicBlockPtr> father_basic_blocks;
-    unsigned int id;
+    unsigned int id = -1;
 
     void insert_father(BasicBlockPtr basic_block) {
         father_basic_blocks.push_back(basic_block);

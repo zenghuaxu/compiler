@@ -5,8 +5,6 @@
 #ifndef LLVMCONTEXT_H
 #define LLVMCONTEXT_H
 
-#include <memory>
-
 #include "llvm.h"
 #include "ir/value.h"
 #include "valueReturnType.h"
@@ -17,9 +15,10 @@ class LLVMContext {
     friend class Module;
 
     private:
-    LLVMContext(): char_type(++current_id, this),
-                int_type(++current_id, this),
-                void_type(++current_id, this){}
+    LLVMContext(): void_type(++current_id, this),
+                bit_type(++current_id, this),
+                char_type(++current_id, this),
+                int_type(++current_id, this) {}
 
     public:
     template <typename T> T* SaveValue(ValuePtr value) {
@@ -43,6 +42,7 @@ class LLVMContext {
         main_func = function;
     }
 
+    ValueReturnTypePtr getBitType() { return &bit_type; }
     ValueReturnTypePtr getIntType() { return &int_type; }
     ValueReturnTypePtr getCharType() { return &char_type; }
     ValueReturnTypePtr getVoidType() { return &void_type; }
@@ -77,6 +77,7 @@ private:
     std::vector<GlobalValuePtr> globals;
 
     unsigned int current_id = 0;
+    BitType bit_type;
     CharType char_type;
     IntType int_type;
     VoidType void_type;
