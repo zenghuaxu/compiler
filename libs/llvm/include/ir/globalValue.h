@@ -26,6 +26,7 @@ const std::unordered_map<int, std::string> value_to_char = {
 };
 
 class GlobalValue:public Value {
+    friend class Translator;
     private:
     std::string init_string;
     std::vector<int> init_vector;
@@ -97,7 +98,7 @@ class GlobalValue:public Value {
     void print_str(std::ostream &out) {
         for (char i : init_string) {
             if (value_to_char.find(i) == value_to_char.end()) {
-                out << static_cast<char>(i);
+                out << i;
             }
             else {
                 out << value_to_char.at(i);

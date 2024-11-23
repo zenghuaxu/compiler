@@ -1,0 +1,13 @@
+add_library(frontend
+        include/ast.h
+        include/error.h
+        include/lexer.h
+        include/parser.h
+        include/symtable.h
+        include/token.h
+        include/visitor.h
+        src/ast.cpp
+        src/lexer.cpp
+        src/parser.cpp
+        src/visitor.cpp
+)

@@ -15,20 +15,56 @@
 
 class Instruction: public User {
     friend class BasicBlock;
+    friend class Translator;
 
     public:
     Instruction(ValueReturnTypePtr return_type, ValueType type, BasicBlockPtr basic_block);
 
     ~Instruction() override = default;
 
+    void mark_active(int i) {
+        active_block_seq.insert(i);
+    }
+
     void print(std::ostream &out) override {
         out << "%" << id;
     }
     virtual void print_full(std::ostream &out) = 0;
 
+    std::set<int> get_active_block_seq() {
+        return active_block_seq;
+    }
+    void add_conflict(InstructionPtr instruction) {
+        conflicting_instructions.insert(instruction);
+    }
+    int get_conflict_count() {
+        return conflicting_instructions.size();
+    }
+    bool contains_conflict(InstructionPtr instruction) {
+        return conflicting_instructions.find(instruction) != conflicting_instructions.end();
+    }
+
     private:
     unsigned int id = 0;
     void mark_id(unsigned int &id_alloc);
+
+    //活跃的块
+    std::set<int> active_block_seq;
+    //跨块活跃
+    bool is_global = false;
+    //冲突的全局变量
+    std::set<InstructionPtr> conflicting_instructions;
+    int map_times = 0;
+
+    bool add_map_and_try_release() {
+        if (is_global) return false;
+        map_times++;
+        assert(user_list.size() >= map_times);
+        if (user_list.size() == map_times) {
+            return true;
+        }
+        return false;
+    }
 
     protected:
     unsigned int get_id() {
@@ -44,14 +80,10 @@ inline std::unordered_map<TokenType, UnaryOpType> tokentype_to_unary_op = {
 };
 
 class UnaryOpInstruction: public Instruction {
-    public:
-    explicit UnaryOpInstruction(ValueReturnTypePtr return_type, TokenType op,
-        ValuePtr value, BasicBlockPtr basic_block):
-        Instruction(return_type, ValueType::UnaryInst, basic_block) {
-        try {this->op = tokentype_to_unary_op[op];} catch(std::invalid_argument& e) {std::cout << e.what() << '\n';}
-        add_use(new Use(this, value));
-    }
+    friend class Translator;
 
+    public:
+    UnaryOpInstruction(ValueReturnTypePtr return_type, TokenType op, ValuePtr value, BasicBlockPtr basic_block);
     void print_full(std::ostream &out) override {
         switch (this->op) {
             case UnaryOpType::NEG: {
@@ -92,6 +124,8 @@ inline std::unordered_map<BinaryOp, std::string> binary_op_to_string = {
 };
 
 class BinaryInstruction: public Instruction {
+    friend class Translator;
+
     public:
     BinaryInstruction(ValueReturnTypePtr return_type, TokenType op, ValuePtr lhs, ValuePtr rhs,
                   BasicBlockPtr basic_block);
@@ -140,6 +174,8 @@ inline std::unordered_map<CompOp, std::string> comp_op_to_string = {
 };
 
 class CompareInstruction: public Instruction {
+    friend class Translator;
+
     public:
     CompareInstruction(ValueReturnTypePtr return_type, TokenType op, ValuePtr lhs, ValuePtr rhs,
                   BasicBlockPtr basic_block);
@@ -154,12 +190,16 @@ class CompareInstruction: public Instruction {
         use_list.at(1)->getValue()->print(out);
     }
 
+    CompOp get_comp_op() { return op; }
+
     private:
     CompOp op;
     ValueReturnTypePtr comp_type;
 };
 
 class BranchInstruction: public Instruction {
+    friend class Translator;
+
     public:
     BranchInstruction(ValuePtr condition, BasicBlockPtr true_block, BasicBlockPtr false_block,
         BasicBlockPtr current_block);
@@ -175,6 +215,8 @@ class BranchInstruction: public Instruction {
 };
 
 class JumpInstruction:public Instruction {
+    friend class Translator;
+
     public:
     JumpInstruction(BasicBlockPtr jump_block, BasicBlockPtr current_block);
 
@@ -185,6 +227,8 @@ class JumpInstruction:public Instruction {
 };
 
 class AllocaInstruction: public Instruction {
+    friend class Translator;
+
 public:
     //the return_type is the object type, not the pointer
 
@@ -195,12 +239,15 @@ public:
     }
 
     AllocaInstruction(ValueReturnTypePtr return_type, BasicBlockPtr basic_block);
+    ValueReturnTypePtr get_object_type() { return object_type; }
 
     private:
     ValueReturnTypePtr object_type;
 };
 
 class ZextInstruction: public Instruction {
+    friend class Translator;
+
     public:
     ZextInstruction(ValuePtr value, BasicBlockPtr basic_block);
 
@@ -217,6 +264,8 @@ class ZextInstruction: public Instruction {
 };
 
 class TruncInstruction: public Instruction {
+    friend class Translator;
+
     public:
 
     void print_full(std::ostream &out) override {
@@ -234,6 +283,8 @@ class TruncInstruction: public Instruction {
 };
 
 class CallInstruction: public Instruction {
+    friend class Translator;
+
     public:
     CallInstruction(ValueReturnTypePtr return_type, FunctionPtr function, BasicBlockPtr basic_block):
         Instruction(return_type, ValueType::CallInst, basic_block), function(function) {}
@@ -249,21 +300,22 @@ private:
 };
 
 class ReturnInstruction: public Instruction {
-public:
-    ReturnInstruction(ValueReturnTypePtr return_type, FunctionPtr function, ValuePtr ret_val, BasicBlockPtr basic_block):
-        Instruction(return_type, ValueType::ReturnInst, basic_block) {
-        if (ret_val) {
-            this->add_use(new Use(this, ret_val));
-        }
-        this->function = function;
-    }
+    friend class Translator;
 
-    void print_full(std::ostream &out);
-    private:
+public:
+
+    void print_full(std::ostream &out) override;
+
+    ReturnInstruction(ValueReturnTypePtr return_type, FunctionPtr function, ValuePtr ret_val,
+                      BasicBlockPtr basic_block);
+
+private:
     FunctionPtr function;
 };
 
 class LoadInstruction: public Instruction {
+    friend class Translator;
+
     public:
 
     void print_full(std::ostream &out) override {
@@ -280,6 +332,8 @@ class LoadInstruction: public Instruction {
 };
 
 class StoreInstruction: public Instruction {
+    friend class Translator;
+
     public:
 
     void print_full(std::ostream &out) override {
@@ -299,6 +353,8 @@ class StoreInstruction: public Instruction {
 };
 
 class GetElementPtrInstruction: public Instruction {
+    friend class Translator;
+
     public:
     GetElementPtrInstruction(ValuePtr base, ValuePtr offset, BasicBlockPtr basic_block);
 
@@ -328,6 +384,8 @@ class GetElementPtrInstruction: public Instruction {
 };
 
 class InputInstruction: public Instruction {
+    friend class Translator;
+
     public:
     explicit InputInstruction(ValueReturnTypePtr return_type, BasicBlockPtr basic_block, bool ch_type):
         Instruction(return_type, ValueType::InputInst, basic_block), ch_type(ch_type) {}
@@ -347,6 +405,8 @@ class InputInstruction: public Instruction {
 };
 
 class OutputInstruction: public Instruction {
+    friend class Translator;
+
     public:
     //put char: char ;int: int :str: char*
     OutputInstruction(ValuePtr value, BasicBlockPtr basic_block);

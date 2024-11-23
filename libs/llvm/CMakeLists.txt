@@ -1,0 +1,21 @@
+add_library(llvm
+        include/ir/argument.h
+        include/ir/basicBlock.h
+        include/ir/constant.h
+        include/ir/function.h
+        include/ir/globalValue.h
+        include/ir/instructions.h
+        include/ir/module.h
+        include/ir/use.h
+        include/ir/user.h
+        include/ir/value.h
+        include/llvm.h
+        include/llvmContext.h
+        include/valueReturnType.h
+        src/ir/basicBlock.cpp
+        src/ir/function.cpp
+        src/ir/globalValue.cpp
+        src/ir/instructions.cpp
+        src/ir/use.cpp
+        src/llvmContext.cpp
+)

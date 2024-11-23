@@ -13,17 +13,18 @@
 
 class LLVMContext {
     friend class Module;
+    friend class MipsManager;
 
     private:
     LLVMContext(): void_type(++current_id, this),
                 bit_type(++current_id, this),
                 char_type(++current_id, this),
-                int_type(++current_id, this) {}
+                int_type(++current_id, this),
+                main_func(nullptr) {}
 
     public:
-    template <typename T> T* SaveValue(ValuePtr value) {
+    void SaveValue(ValuePtr value) {
         values.push_back(value);
-        return static_cast<T*>(value);
     }
     void DeleteValue(ValuePtr value) {
         //TODO DO NOTHING?

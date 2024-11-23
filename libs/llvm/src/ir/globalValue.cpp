@@ -13,7 +13,7 @@ GlobalValue::GlobalValue(ValueReturnTypePtr return_type, std::string name):
     Value(return_type->getContext()->getPointerType(return_type)
     //array to pointer
     , ValueType::GlobalVariable) {
-    return_type->getContext()->SaveValue<GlobalValue>(this);
+    return_type->getContext()->SaveValue(this);
     return_type->getContext()->SaveGlobal(this);
     global_value_type = return_type;
     this->name = std::move(name);

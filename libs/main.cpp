@@ -10,6 +10,7 @@
 #include "frontend/include/parser.h"
 #include "frontend/include/visitor.h"
 #include "include/io.h"
+#include "mips/include/mipsManager.h"
 
 int main() {
     //open src file
@@ -45,7 +46,7 @@ int main() {
     //semantic analysis
     comp_unit_ptr->print(std::cout);
     auto visitor = Visitor(errors);
-    visitor.visit(*comp_unit_ptr);
+    auto module = visitor.visit(*comp_unit_ptr);
     #ifdef SEMANTIC_
         OUTPUT_OPEN(output, symbol.txt)
         visitor.print_symbol(output);
@@ -61,8 +62,15 @@ int main() {
 
     #ifdef LLVM_IR
     OUTPUT_OPEN(output, llvm_ir.txt);
-    visitor.print_llvm(output);
+    module->print(output);
     #endif
+
+    auto mips = new MipsManager(module);
+    mips->translate();
+    mips->print(std::cout);
+
+    OUTPUT_OPEN(mips_out, mips.txt);
+    mips->print(mips_out);
 
     return 0;
 }

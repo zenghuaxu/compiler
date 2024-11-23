@@ -18,6 +18,8 @@ class ValueReturnType {
     virtual bool isInt() = 0;
     virtual void print(std::ostream &out) = 0;
     virtual ValueReturnTypePtr get_ele_type() = 0;
+    virtual int get_length() = 0;
+    virtual int get_byte_size() = 0;
     bool operator<(const ValueReturnType &other) const {
         return type_id < other.type_id;
     }
@@ -39,6 +41,8 @@ class BitType: public ValueReturnType {
     void print(std::ostream &out) override {
         out << "i1";
     }
+    int get_length() override { return 1; }
+    int get_byte_size() override { return 1; }
     ValueReturnTypePtr get_ele_type() override { return this; }
 
     protected:
@@ -54,6 +58,8 @@ class CharType : public ValueReturnType {
     void print(std::ostream &out) override {
         out << "i8";
     }
+    int get_length() override { return 1; }
+    int get_byte_size() override { return 1; }
     ValueReturnTypePtr get_ele_type() override { return this; }
 
     protected:
@@ -69,6 +75,8 @@ class IntType : public ValueReturnType {
     void print(std::ostream &out) override {
         out << "i32";
     }
+    int get_length() override { return 1; }
+    int get_byte_size() override { return 4; }
     ValueReturnTypePtr get_ele_type() override { return this; }
 
     private:
@@ -84,6 +92,8 @@ class VoidType : public ValueReturnType {
     void print(std::ostream &out) override {
         out << "void";
     }
+    int get_length() override { return 0; }
+    int get_byte_size() override { return 0; }
     ValueReturnTypePtr get_ele_type() override { return this; }
 
     private:
@@ -101,6 +111,8 @@ class PointerType : public ValueReturnType {
         referenced_type->print(out);
         out << '*';
     }
+    int get_length() override { return 1; }
+    int get_byte_size() override { return 4; }
     ValueReturnTypePtr get_ele_type() override { return this; }
 
     protected:
@@ -124,6 +136,8 @@ class ValueArrayType : public ValueReturnType {
         element_type->print(out);
         out << ']';
     }
+    int get_length() override { return size; }
+    int get_byte_size() override { return size * element_type->get_byte_size(); }
     ValueReturnTypePtr get_ele_type() override { return element_type; }
 
     ValueReturnTypePtr get_element_type() { return element_type; }

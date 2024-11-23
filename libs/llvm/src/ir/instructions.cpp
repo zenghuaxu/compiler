@@ -6,7 +6,13 @@
 
 Instruction::Instruction(ValueReturnTypePtr return_type, ValueType type, BasicBlockPtr basic_block):
         User(return_type, type) {
-    basic_block->add_inst(this);
+    if (type != ValueType::AllocaInst) {
+        basic_block->add_inst(this);
+    }
+    else {
+        basic_block->get_function()->insert_allocation(this);
+    }
+    return_type->getContext()->SaveValue(this);
 }
 
 void Instruction::mark_id(unsigned int &id_alloc) {
@@ -18,13 +24,19 @@ void Instruction::mark_id(unsigned int &id_alloc) {
     }
 }
 
+UnaryOpInstruction::UnaryOpInstruction(ValueReturnTypePtr return_type, TokenType op,
+    ValuePtr value, BasicBlockPtr basic_block):
+    Instruction(return_type, ValueType::UnaryInst, basic_block) {
+    try {this->op = tokentype_to_unary_op[op];} catch(std::invalid_argument& e) {std::cout << e.what() << '\n';}
+    add_use(new Use(this, value));
+}
+
 BinaryInstruction::BinaryInstruction(ValueReturnTypePtr return_type, TokenType op,
     ValuePtr lhs, ValuePtr rhs, BasicBlockPtr basic_block):
     Instruction(return_type, ValueType::BinaryInst, basic_block) {
     try {this->op = tokentype_to_binary_op[op];} catch (std::invalid_argument& e) {std::cout << e.what() << '\n';}
     this->add_use(new Use(this, lhs));
     this->add_use(new Use(this, rhs));
-    return_type->getContext()->SaveValue<BinaryInstruction>(this);
 }
 
 CompareInstruction::CompareInstruction(ValueReturnTypePtr return_type, TokenType op,
@@ -34,7 +46,6 @@ CompareInstruction::CompareInstruction(ValueReturnTypePtr return_type, TokenType
     this->add_use(new Use(this, lhs));
     this->add_use(new Use(this, rhs));
     comp_type = lhs->get_value_return_type();
-    return_type->getContext()->SaveValue<CompareInstruction>(this);
 }
 
 BranchInstruction::BranchInstruction(ValuePtr condition, BasicBlockPtr true_block, BasicBlockPtr false_block,
@@ -56,8 +67,8 @@ JumpInstruction::JumpInstruction(BasicBlockPtr jump_block, BasicBlockPtr current
 }
 
 AllocaInstruction::AllocaInstruction(ValueReturnTypePtr return_type, BasicBlockPtr basic_block):
-        Instruction(return_type->getContext()->getPointerType(return_type), ValueType::AllocaInst, basic_block) {
-    return_type->getContext()->SaveValue<AllocaInstruction>(this);
+        Instruction(return_type->getContext()->getPointerType(return_type),
+            ValueType::AllocaInst, basic_block) {
     object_type = return_type;
 }
 
@@ -106,6 +117,14 @@ void ReturnInstruction::print_full(std::ostream &out) {
     }
 }
 
+ReturnInstruction::ReturnInstruction(ValueReturnTypePtr return_type, FunctionPtr function, ValuePtr ret_val, BasicBlockPtr basic_block):
+    Instruction(return_type, ValueType::ReturnInst, basic_block) {
+    if (ret_val) {
+        this->add_use(new Use(this, ret_val));
+    }
+    this->function = function;
+}
+
 LoadInstruction::LoadInstruction(ValuePtr value, BasicBlockPtr basic_block):
     Instruction(dynamic_cast<PointerTypePtr>(value->get_value_return_type())->get_referenced_type(),
         ValueType::LoadInst, basic_block) {
@@ -132,7 +151,6 @@ OutputInstruction::OutputInstruction(ValuePtr value, BasicBlockPtr basic_block, 
     value_return_type = value->get_value_return_type();
     this->add_use(new Use(this, value));
 }
-
 
 GetElementPtrInstruction::GetElementPtrInstruction(ValuePtr base, ValuePtr offset, BasicBlockPtr basic_block):
     Instruction(base->get_value_return_type()->getContext()

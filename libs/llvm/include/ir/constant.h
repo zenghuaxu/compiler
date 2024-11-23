@@ -29,7 +29,7 @@ class Constant : public Value {
     Constant(int const_value, ValueReturnTypePtr return_type):
         Value(return_type, ValueType::Constant) {
         this->int_va =  const_value;
-        return_type->getContext()->SaveValue<Constant>(this);
+        return_type->getContext()->SaveValue(this);
     };
 
     ~Constant() override {

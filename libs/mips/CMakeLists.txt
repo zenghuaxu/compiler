@@ -1,0 +1,11 @@
+add_library(mips
+        include/data.h
+        include/mips.h
+        include/mipsInst.h
+        include/mipsManager.h
+        include/mipsReg.h
+        include/translator.h
+        src/mipsInstPrint.cpp
+        src/mipsManager.cpp
+        src/translator.cpp
+)

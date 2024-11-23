@@ -4,11 +4,15 @@
 
 #ifndef BASICBLOCK_H
 #define BASICBLOCK_H
+#include <set>
+#include <unordered_set>
+
 #include "../llvm.h"
 #include "instructions.h"
 #include "user.h"
 
 class BasicBlock: public User{
+    friend class Translator;
     public:
     explicit BasicBlock(ValueReturnTypePtr return_type, FunctionPtr function_ptr);
 
@@ -58,16 +62,27 @@ class BasicBlock: public User{
 
     ~BasicBlock() override = default;
 
+    void mark_active(int i);
+    bool update_in_set();
+    void fetch_cross(std::vector<InstructionPtr> &cross);
+    void create_use_def();
+
 private:
     FunctionPtr function;
     std::vector<BasicBlockPtr> goto_basic_blocks;
     std::vector<BasicBlockPtr> father_basic_blocks;
     unsigned int id = -1;
 
+    std::set<InstructionPtr> use_set;
+    std::set<InstructionPtr> def_set;
+    std::set<InstructionPtr> in_set;
+    std::set<InstructionPtr> out_set;
+
     void insert_father(BasicBlockPtr basic_block) {
         father_basic_blocks.push_back(basic_block);
     }
 
+    void add_to_use_def(InstructionPtr inst);
 };
 
 #endif //BASICBLOCK_H

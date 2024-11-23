@@ -23,13 +23,14 @@ class SymType {
 
     virtual bool match(std::shared_ptr<SymType> sym_type) = 0;
     virtual bool operator==(std::shared_ptr<SymType> sym_type) = 0;
+
     virtual std::shared_ptr<SymType> evaluate () = 0;
+
     virtual bool isConst() = 0;
     virtual bool isVoid() = 0;
-    virtual bool isInt() = 0;
-    virtual bool isInferable() = 0;
-    virtual void set_inferable() = 0;
+
     virtual ValueReturnTypePtr toValueType(LLVMContextPtr context) = 0;
+
     virtual void print(std::ostream &out) = 0;
 };
 
@@ -44,11 +45,10 @@ class BasicType final : public SymType {
     private:
     basic_type type;
     bool constant_obj;
-    bool inferable;
 
     public:
     BasicType(const bool constant_obj, const TokenType token_type):
-    constant_obj(constant_obj), inferable(constant_obj) {
+    constant_obj(constant_obj) {
         static std::map<TokenType, basic_type> basic_type_map = {
             {TokenType::INTTK, int_type},
             {TokenType::CHARTK, char_type},
@@ -60,7 +60,6 @@ class BasicType final : public SymType {
             std::cout << e.what() << '\n';
         }
     };
-
     BasicType(const bool const_obj, basic_type type) :
     constant_obj(const_obj), type(type) {}
 
@@ -68,6 +67,14 @@ class BasicType final : public SymType {
         return type != void_type &&
             typeid(*sym_type) == typeid(BasicType) &&
             std::dynamic_pointer_cast<BasicType>(sym_type)->type != void_type;
+    }
+    bool operator==(std::shared_ptr<SymType> other) override {
+        if (typeid(*other) != typeid(BasicType)) {
+            return false;
+        }
+        auto basic = std::dynamic_pointer_cast<BasicType>(other);
+        return type == basic->type;
+        //TODO ONLY TYPE THE SAME, CONSTANT ATTRIBUTE NOT
     }
 
     std::shared_ptr<SymType> evaluate() override {
@@ -78,41 +85,8 @@ class BasicType final : public SymType {
     bool isConst() override {
         return constant_obj;
     }
-
-    bool isInferable() override {
-        return inferable;
-    }
-
-    void set_inferable() override {
-        inferable = false;
-    }
-
-    void print(std::ostream &out) override {
-        if (constant_obj) {
-            out << "Const";
-        }
-        switch (type) {
-            case void_type: {out << "Void"; break;}
-            case int_type: {out << "Int"; break;}
-            case char_type: {out << "Char"; break;}
-        }
-    }
-
     bool isVoid() override {
         return type == void_type;
-    }
-
-    bool isInt() override {
-        return type == int_type;
-    }
-
-    bool operator==(std::shared_ptr<SymType> other) override {
-        if (typeid(*other) != typeid(BasicType)) {
-            return false;
-        }
-        auto basic = std::dynamic_pointer_cast<BasicType>(other);
-        return type == basic->type;
-        //TODO ONLY TYPE THE SAME, CONSTANT ATTRIBUTE NOT
     }
 
     basic_type get_basic_type() {
@@ -126,6 +100,17 @@ class BasicType final : public SymType {
             case char_type: return context->getCharType();
         }
         return nullptr;
+    }
+
+    void print(std::ostream &out) override {
+        if (constant_obj) {
+            out << "Const";
+        }
+        switch (type) {
+            case void_type: {out << "Void"; break;}
+            case int_type: {out << "Int"; break;}
+            case char_type: {out << "Char"; break;}
+        }
     }
 };
 
@@ -145,7 +130,6 @@ class ArrayType final : public SymType {
         const auto array = std::dynamic_pointer_cast<ArrayType>(sym_type);
         return *array->_element_type == _element_type;
     }
-
     bool operator==(std::shared_ptr<SymType> sym_type) override {
         if (typeid(*sym_type) != typeid(ArrayType)) {
             return false;
@@ -161,36 +145,24 @@ class ArrayType final : public SymType {
     std::shared_ptr<SymType> element_type() {
         return _element_type;
     }
+    unsigned int get_size() const {
+        return _size;
+    }
 
     bool isConst() override {
         return _element_type->isConst();
     }
-
-    bool isInferable() override {
-        return false;//value not ferable
-    }
-
-    void set_inferable() override {}
-
     bool isVoid() override {
         return false;
-    }
-
-    bool isInt() override {
-        return false;
-    }
-
-    void print(std::ostream &out) override {
-        _element_type->print(out);
-        out << "Array";
     }
 
     ValueReturnTypePtr toValueType(LLVMContextPtr context) override {
         return context->getArrayType(_element_type->toValueType(context), _size);
     }
 
-    unsigned int get_size() {
-        return _size;
+    void print(std::ostream &out) override {
+        _element_type->print(out);
+        out << "Array";
     }
 };
 
@@ -207,8 +179,7 @@ class FunctionType : public SymType {
         _params.push_back(param_type);
     }
 
-    bool match(std::shared_ptr<SymType> sym_type) override {return false;}//TODO
-
+    bool match(std::shared_ptr<SymType> sym_type) override { return false;}//TODO
     bool operator==(std::shared_ptr<SymType> sym_type) override {
         if (typeid(*sym_type) != typeid(FunctionType)) {
             return false;
@@ -224,30 +195,13 @@ class FunctionType : public SymType {
     bool isConst() override {
         return false;
     }
-
-    bool isInferable() override {
-        return false;//value not ferable
-    }
-
-    void set_inferable() override {}
-
-    void print(std::ostream &out) override {
-        _return_type->print(out);
-        out << "Func";
-    }
-
     bool isVoid() override {
-        return false;
-    }
-
-    bool isInt() override {
         return false;
     }
 
     std::vector<std::shared_ptr<SymType>> get_params() {
         return _params;
     }
-
     ValueReturnTypePtr get_return_type(LLVMContextPtr context) {
         assert(typeid(*_return_type) == typeid(BasicType));
         auto type = std::dynamic_pointer_cast<BasicType>(_return_type);
@@ -261,6 +215,11 @@ class FunctionType : public SymType {
 
     ValueReturnTypePtr toValueType(LLVMContextPtr context) override {
         return _return_type->toValueType(context);
+    }
+
+    void print(std::ostream &out) override {
+        _return_type->print(out);
+        out << "Func";
     }
 };
 
@@ -291,7 +250,6 @@ class Symbol {
     void insert_addr_addr(ValuePtr addr) {
         addr_addr = addr;
     }
-
     ValuePtr get_addr_addr() {
         return addr_addr;
     }
@@ -299,7 +257,6 @@ class Symbol {
     void insert_addr(ValuePtr addr) {
         object_addr = addr;
     }
-
     ValuePtr get_addr() {
         return object_addr;
     }
@@ -307,10 +264,10 @@ class Symbol {
     void insert_value(ConstantPtr value) {
         const_value = value;
     }
-
     ConstantPtr get_value() {
         return const_value;
     }
+
     void insert_parameter(const std::shared_ptr<SymType>& type) {
         #ifdef DEBUG_SEMANTIC
         std::cout << typeid(*this->type).name() << std::endl;
@@ -341,7 +298,6 @@ class SymTable: public std::enable_shared_from_this<SymTable>{
     bool exist_in_table(const std::string& identifier) {
         return symbols.find(identifier) != symbols.end();
     }
-
     std::shared_ptr<Symbol> get_from_all_scopes(const std::string& identifier) {
         if (auto index = symbols.find(identifier); index != symbols.end()) {
             return symbols[identifier];
@@ -351,7 +307,6 @@ class SymTable: public std::enable_shared_from_this<SymTable>{
         }
         return father->get_from_all_scopes(identifier);
     }
-
     bool exist_in_all_scopes(const std::string& identifier) {
         if (exist_in_table(identifier)) {
             return true;
@@ -378,11 +333,9 @@ class SymTable: public std::enable_shared_from_this<SymTable>{
         auto new_scope = std::make_shared<SymTable>(shared_from_this(), id);
         return new_scope;
     }
-
     std::shared_ptr<SymTable> pop_scope() {
         return father;
     }
-
     void print_table(std::ostream &out) {
         for (const auto& symbol: ordered_symbol) {
             out << std::to_string(scope_id) + " ";

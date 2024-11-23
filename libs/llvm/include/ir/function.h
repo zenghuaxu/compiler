@@ -4,19 +4,21 @@
 
 #ifndef FUNCTION_H
 #define FUNCTION_H
-#include <utility>
-#include <iostream>
+#include <unordered_map>
 
 #include "../llvm.h"
 #include "basicBlock.h"
-#include "user.h"
 #include "argument.h"
 #include "instructions.h"
+#include "../../../mips/include/mips.h"
 
 class Function:public Value{
+    friend class Translator;
     public:
     explicit Function(ValueReturnTypePtr return_type, bool is_main,
     std::string name);
+
+    void insert_allocation(InstructionPtr alloc);
 
     ~Function() override {
         for (const auto arg : args) {
@@ -38,6 +40,10 @@ class Function:public Value{
     void print(std::ostream &out) override;
 
     void pad();
+    void create_conflict_graph();
+
+    void global_register_map(std::vector<SaveRegPtr> &save_regs, std::unordered_map<ValuePtr, RegPtr> &map,
+        DynamicOffsetPtr offset);
 
     std::string get_name() {
         return name;
@@ -60,6 +66,9 @@ class Function:public Value{
     std::vector<BasicBlockPtr> blocks;
     std::string name;
     unsigned int current_object_id;
+
+    std::vector<InstructionPtr> cross_block_variable;
+    int saved_reg_used_num = 0;
 };
 
 #endif //FUNCTION_H

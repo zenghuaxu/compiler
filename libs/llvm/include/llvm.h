@@ -35,12 +35,20 @@ class Instruction;
 using InstructionPtr = Instruction*;
 class UnaryOpInstruction;
 using UnaryOpInstructionPtr = UnaryOpInstruction*;
-class BinaryOpInstruction;
-using BinaryOpInstructionPtr = BinaryOpInstruction*;
+class BinaryInstruction;
+using BinaryInstructionPtr = BinaryInstruction*;
+class CompareInstruction;
+using CompareInstructionPtr = CompareInstruction*;
+class BranchInstruction;
+using BranchInstructionPtr = BranchInstruction*;
+class JumpInstruction;
+using JumpInstructionPtr = JumpInstruction*;
 class AllocaInstruction;
 using AllocaInstructionPtr = AllocaInstruction*;
 class CallInstruction;
 using CallInstructionPtr = CallInstruction*;
+class ReturnInstruction;
+using ReturnInstructionPtr = ReturnInstruction*;
 class LoadInstruction;
 using LoadInstructionPtr = LoadInstruction*;
 class StoreInstruction;
@@ -49,13 +57,18 @@ class ZextInstruction;
 using ZextInstructionPtr = ZextInstruction*;
 class TruncInstruction;
 using TruncInstructionPtr = TruncInstruction*;
+class InputInstruction;
+using InputInstructionPtr = InputInstruction*;
+class OutputInstruction;
+using OutputInstructionPtr = OutputInstruction*;
+class GetElementPtrInstruction;
+using GetElementPtrInstructionPtr = GetElementPtrInstruction*;
 
 class BasicBlock;
 using BasicBlockPtr = BasicBlock*;
 
 class Function;
 using FunctionPtr = Function*;
-
 class Argument;
 using ArgumentPtr = Argument*;
 

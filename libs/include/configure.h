@@ -8,6 +8,7 @@
 // #define DEBUG_PARSER
 #define DEBUG_SEMANTIC
 #define IR_DEBUG
+#define MIPS_DEBUG
 
 //#define LEXER_
 //#define PARSER_

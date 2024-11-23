@@ -9,7 +9,6 @@
 #include "../llvmContext.h"
 
 class Module {
-
     public:
     Module() {
         context = new LLVMContext();

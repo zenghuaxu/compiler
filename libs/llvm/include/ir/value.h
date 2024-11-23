@@ -4,6 +4,8 @@
 
 #ifndef VALUE_H
 #define VALUE_H
+#include <assert.h>
+
 #include "vector"
 
 #include "../llvm.h"
@@ -36,6 +38,7 @@ enum class ValueType {
 };
 
 class Value {
+    friend class Translator;
     public:
     Value(ValueReturnTypePtr return_type, ValueType type):
         return_type(return_type), type(type) {
@@ -56,7 +59,9 @@ class Value {
     }
 
     protected:
+    //for translator, to see if end
     std::vector<UserPtr> user_list;
+
 
     public:
     void add_user(UserPtr user) {

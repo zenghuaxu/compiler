@@ -16,16 +16,39 @@
 template <class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
 template <class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 
-ValuePtr Visitor::visit_number(Number &node) {
+ValuePtr Visitor::visit_number(Number &node) const {
     auto content = node.token->getContent();
     int num = std::stoi(content);
     return new Constant(num, current_module->getContext()->getIntType());
 }
 
-ValuePtr Visitor::visit_character(Character &node) {
+ValuePtr Visitor::visit_character(Character &node) const {
     node.token->getContent();
     auto ch = node.get_value();
     return new Constant(ch, current_module->getContext()->getIntType());
+}
+
+/**
+ *
+ * @param origin origin type
+ * @param target target type
+ * @param value object need to alter type
+ * @return instruction
+ * NOTICE:: CHAR->INT ZERO EXTENSION?
+ */
+ValuePtr Visitor::type_conversion(ValueReturnTypePtr origin,
+    ValueReturnTypePtr target, ValuePtr value) {
+    if (origin != target) {
+        if (typeid(*value) == typeid(Constant)) {
+            return new Constant(dynamic_cast<ConstantPtr>(value)->get_value(), target);
+        }
+        //TODO CHECK OVERLOAD
+        if (*origin < *target) {
+            return new ZextInstruction(value, current_basic_block);
+        }
+        return new TruncInstruction(value, current_basic_block);
+    }
+    return value;
 }
 
 void Visitor::visit_l_or_exp(LOrExp &node, BasicBlockPtr true_block, BasicBlockPtr false_block) {
@@ -94,29 +117,6 @@ ValuePtr Visitor::visit_rel_exp(RelExp &node) {
         node.op->getType(), left, right, current_basic_block);
 }
 
-/**
- *
- * @param origin origin type
- * @param target target type
- * @param value object need to alter type
- * @return instruction
- * NOTICE:: CHAR->INT ZERO EXTENSION?
- */
-ValuePtr Visitor::type_conversion(ValueReturnTypePtr origin,
-    ValueReturnTypePtr target, ValuePtr value) {
-    if (origin != target) {
-        if (typeid(*value) == typeid(Constant)) {
-            return new Constant(dynamic_cast<ConstantPtr>(value)->get_value(), target);
-        }
-        //TODO CHECK OVERLOAD
-        if (*origin < *target) {
-            return new ZextInstruction(value, current_basic_block);
-        }
-        return new TruncInstruction(value, current_basic_block);
-    }
-    return value;
-}
-
 ValuePtr Visitor::visit_add_exp(AddExp &node, std::shared_ptr<SymType> &type) {
     std::shared_ptr<SymType> l_type , r_type;
     if (!node.lhs) {
@@ -183,13 +183,6 @@ ValuePtr Visitor::visit_unary_exp(UnaryExp &node, std::shared_ptr<SymType> &type
     if (std::holds_alternative<CallExp>(node)) {
         const auto call = std::get_if<CallExp>(&node);
         auto call_value = visit_call_exp(*call, type);
-        // current_basic_block = new BasicBlock(current_module->getContext()->getVoidType(),
-        //     current_basic_block->get_function());
-        //TODO HOW TO GO BACK??
-        //NEED TO CREATE A BB? NO NEED
-        //DO NOT TYPE CONVERT HERE TODO
-        // call_value = type_conversion(call_value->get_value_return_type(),
-        //         current_module->getContext()->getIntType(), call_value);
         return call_value;
     }
     if (std::holds_alternative<OpUnaryExp>(node)) {
@@ -260,8 +253,13 @@ ValuePtr Visitor::visit_call_exp(CallExp &node, std::shared_ptr<SymType> &type) 
                     errors.emplace_back('d', node.identifier->getLine());
                     return new Constant(0, current_module->getContext()->getIntType());
                 }
-                return new CallInstruction(return_type,
+                auto call =  new CallInstruction(return_type,
                     dynamic_cast<FunctionPtr>(symbol->get_addr()), current_basic_block);
+                auto new_block = new_basic_block(current_basic_block->get_function());
+                current_basic_block->insert_goto(new_block);
+                new JumpInstruction(new_block, current_basic_block);
+                current_basic_block = new_block;
+                return call;
             }
             if (node.func_r_params->exps.size() != params.size()) {
                 errors.emplace_back('d', node.identifier->getLine());
@@ -290,6 +288,10 @@ ValuePtr Visitor::visit_call_exp(CallExp &node, std::shared_ptr<SymType> &type) 
             for (auto value: values) {
                 call->insert_parameter(value);//TODO CHECK ARRAY
             }
+            auto new_block = new_basic_block(current_basic_block->get_function());
+            current_basic_block->insert_goto(new_block);
+            new JumpInstruction(new_block, current_basic_block);
+            current_basic_block = new_block;
             return call;
         }
 
@@ -302,7 +304,7 @@ ValuePtr Visitor::visit_call_exp(CallExp &node, std::shared_ptr<SymType> &type) 
     return new Constant(0, current_module->getContext()->getIntType());;//TODO CHECK;
 }
 
-void Visitor::visit(CompUnit &node) {
+ModulePtr Visitor::visit(CompUnit &node) {
     for (auto &decl: node.decls) {
         visit_decl(*decl, true);
     }
@@ -315,6 +317,7 @@ void Visitor::visit(CompUnit &node) {
 #ifdef IR_DEBUG
     current_module->print(std::cout);
 #endif
+    return current_module;
 }
 
 void Visitor::visit_decl(Decl &node, bool isGlobal) {
@@ -336,7 +339,7 @@ void Visitor::visit_decl(Decl &node, bool isGlobal) {
     }
 }
 
-ValuePtr Visitor::allocation(std::shared_ptr<SymType> type, bool isGlobal, bool isConst, std::string ident) {
+ValuePtr Visitor::allocation(const std::shared_ptr<SymType>& type, bool isGlobal, bool isConst, std::string ident) {
     ValuePtr value = nullptr;
     if (isConst && typeid(*type) != typeid(ArrayType)) {/*do nothing*/}
     else if (isGlobal) {
@@ -344,9 +347,8 @@ ValuePtr Visitor::allocation(std::shared_ptr<SymType> type, bool isGlobal, bool 
     }
     else {
         value = new AllocaInstruction(type->toValueType(current_module->getContext()), current_basic_block);
-        //TODO STILL WRONG, WHEN ALLOC FOR A POINTER, TO DO THE FOLLOW, ELSE (ARRAY), THE UPPER.
         if (typeid(*type) == typeid(ArrayType) &&
-                std::dynamic_pointer_cast<ArrayType>(type)->get_size() == 0) {
+                std::dynamic_pointer_cast<ArrayType>(type)->get_size() == 0/*WARNING: TO INDICATE IS A POINTER*/) {
             current_sym_tab->get_from_all_scopes(ident)->insert_addr_addr(value);
             return value;
         }
@@ -369,6 +371,7 @@ void Visitor::init_global_object(ValuePtr value, std::shared_ptr<Symbol> symbol,
         if (global_value) {global_value->set_int(constant->get_value());}
         else {
             symbol->insert_value(constant);
+            return; //const scalar
         }
     }
     #ifdef IR_DEBUG
@@ -387,6 +390,10 @@ void Visitor::init_global_object(ValuePtr value, std::shared_ptr<Symbol> symbol,
             }
         }
         global_value->set_string(string_sub);
+    }
+    else {
+        symbol->insert_value(new Constant(0, symbol->get_type()
+            ->toValueType(current_module->getContext())));
     }
 }
 
@@ -1046,13 +1053,13 @@ void Visitor::visit_main_func(MainFuncDef &node) {
     auto main_func = new Function(current_module->getContext()->getIntType(), true, "main");
     current_basic_block = new_basic_block(main_func);
     visit_block(*node.block, BLOCK_WITH_RETURN, false, nullptr,     nullptr);
+    main_func->pad();
     current_sym_tab = current_sym_tab->pop_scope();
 }
 
 std::string Visitor::get_string_name() {
     return "str_" + std::to_string(++str_id);
 }
-
 
 void Visitor::print_symbol(std::ostream &out) {
     for (const auto& table : sym_tables) {
