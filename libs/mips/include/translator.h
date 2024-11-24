@@ -12,7 +12,7 @@ class Translator {
     public:
     Translator(MipsManagerPtr manager): manager(manager) {}
 
-    DataPtr translate(GlobalValuePtr value);
+    static DataPtr translate(GlobalValuePtr value);
 
     void translate(FunctionPtr function, std::vector<MipsInstPtr> &insts);
 
@@ -58,7 +58,7 @@ class Translator {
 
     RegPtr alloc_tmp(ValuePtr value, bool left, DynamicOffsetPtr offset);
 
-    void release_reg(ValuePtr value);
+    void release_reg(ValuePtr value, bool add_use);
 
     SwapRegPtr get_l_swap();
 

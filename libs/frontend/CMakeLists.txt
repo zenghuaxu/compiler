@@ -10,4 +10,8 @@ add_library(frontend
         src/lexer.cpp
         src/parser.cpp
         src/visitor.cpp
+        src/exp_visitor.cpp
+        src/block_item_visitor.cpp
+        src/def_visitor.cpp
+        src/symtable.cpp
 )

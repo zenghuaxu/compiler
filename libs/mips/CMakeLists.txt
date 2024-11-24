@@ -8,4 +8,5 @@ add_library(mips
         src/mipsInstPrint.cpp
         src/mipsManager.cpp
         src/translator.cpp
+        src/inst_translator.cpp
 )

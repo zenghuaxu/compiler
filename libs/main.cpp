@@ -6,10 +6,15 @@
 #include <fstream>
 
 #include "include/configure.h"
+#include "include/io.h"
+
 #include "frontend/include/lexer.h"
 #include "frontend/include/parser.h"
+
 #include "frontend/include/visitor.h"
-#include "include/io.h"
+
+#include "llvm/include/ir/module.h"
+
 #include "mips/include/mipsManager.h"
 
 int main() {

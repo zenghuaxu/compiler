@@ -4,14 +4,10 @@
 
 #ifndef VISITOR_H
 #define VISITOR_H
-#include <memory>
-
 #include "ast.h"
 #include "error.h"
 #include "symtable.h"
-#include "../../llvm/include/ir/basicBlock.h"
-#include "../../llvm/include/ir/module.h"
-#include "../../llvm/include/ir/function.h"
+#include "../../llvm/include/llvm.h"
 
 #define BLOCK_WITH_RETURN 1
 #define BLOCK_WITHOUT_RETURN 0
@@ -28,21 +24,13 @@ class Visitor {
     BasicBlockPtr current_basic_block;
 
     public:
-    explicit Visitor(std::vector<Error> &errors): errors(errors) {
-        current_sym_tab = std::make_shared<SymTable>();
-        current_module = std::make_shared<Module>();
-        current_basic_block = nullptr;
-        #ifdef SYMTABLE_
-        sym_tables.push_back(current_sym_tab);
-        #endif
-    };
-
+    explicit Visitor(std::vector<Error> &errors);
     ModulePtr visit(CompUnit &node);
-
     void print_symbol(std::ostream &out);
     void print_llvm(std::ostream &out);
 
 private:
+    BasicBlockPtr new_basic_block(FunctionPtr function);
 
     void visit_const_def(ConstDef &node, const std::shared_ptr<BasicType> &basic_type, bool isGlobal);
 
@@ -98,12 +86,6 @@ private:
         #ifdef SYMTABLE_
         sym_tables.push_back(current_sym_tab);
         #endif
-    }
-
-    BasicBlockPtr new_basic_block(FunctionPtr function) {
-        auto block = new BasicBlock(current_module->getContext()->getVoidType(), function);
-        function->insert_block(block);
-        return block;
     }
 
     ValuePtr visit_number(Number &node) const;

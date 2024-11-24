@@ -4,7 +4,8 @@
 #include "../include/mips.h"
 #include "../include/mipsReg.h"
 #include "../include/mipsManager.h"
-#include "../../include/configure.h"
+
+#include "../../llvm/include/ir/module.h"
 
 MipsManager::MipsManager(ModulePtr module):
     module(std::move(module)), translator(new Translator(this)) {

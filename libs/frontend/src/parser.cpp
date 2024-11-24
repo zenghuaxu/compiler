@@ -3,10 +3,6 @@
 //
 
 #include "../include/parser.h"
-#include "../include/ast.h"
-#include <cassert>
-
-#include <memory>
 
 std::unique_ptr<CompUnit> Parser::parser() {
     auto compUnit = parse_comp_unit();

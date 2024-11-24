@@ -11,7 +11,6 @@
 #include "mipsInst.h"
 #include "translator.h"
 #include "../../llvm/include/llvm.h"
-#include "../../llvm/include/ir/module.h"
 
 class MipsManager {
     friend class Translator;

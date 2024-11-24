@@ -7,7 +7,6 @@
 #include "ast.h"
 #include "error.h"
 
-
 class Parser {
     private:
     std::vector<Token>& tokens;

@@ -59,8 +59,17 @@ class Instruction: public User {
     bool add_map_and_try_release() {
         if (is_global) return false;
         map_times++;
-        assert(user_list.size() >= map_times);
-        if (user_list.size() == map_times) {
+        assert(user_list.size() > map_times);
+        if (user_list.size() == map_times + 1) {
+            return true;
+        }
+        return false;
+    }
+
+    bool try_release() {
+        if (is_global) return false;
+        assert(user_list.size() > map_times);
+        if (user_list.size() == map_times + 1) {
             return true;
         }
         return false;

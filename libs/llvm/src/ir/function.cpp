@@ -3,11 +3,10 @@
 //
 #include "../../../mips/include/mipsReg.h"
 #include "../../include/ir/function.h"
-
-#include <algorithm>
-
 #include "../../../include/configure.h"
 #include "../../../mips/include/mips.h"
+
+#include <algorithm>
 
 Function::Function(ValueReturnTypePtr return_type, bool is_main,
     std::string name):
@@ -187,13 +186,15 @@ void Function::global_register_map(std::vector<SaveRegPtr> &save_regs,
     //cope with mem
     //TODO CHECK ALLOC
     for (auto it: un_map) {
+        MemOffsetPtr mem_offset;
         if (it->get_value_return_type()->get_ele_type() ==
             it->get_value_return_type()->getContext()->getCharType()) {
-            new MemOffset(offset, it->get_value_return_type()->get_byte_size(), 1);
+            mem_offset = new MemOffset(offset, it->get_value_return_type()->get_byte_size(), 1);
         }
         else {
-            new MemOffset(offset, it->get_value_return_type()->get_byte_size(), 4);
+            mem_offset = new MemOffset(offset, it->get_value_return_type()->get_byte_size(), 4);
         }
+        map[it] = mem_offset;
     }
 
 #ifdef MIPS_DEBUG

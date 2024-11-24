@@ -4,17 +4,13 @@
 
 #ifndef SYMTABLE_H
 #define SYMTABLE_H
-#include <cassert>
-#include <complex>
 #include <memory>
-#include <string>
+#include <vector>
 #include <unordered_map>
-#include <utility>
+#include <cassert>
 
-#include "../../include/configure.h"
-#include "token.h"
 #include "../../llvm/include/llvm.h"
-#include "../../llvm/include/llvmContext.h"
+#include "token.h"
 
 class SymType {
     public:
@@ -93,14 +89,7 @@ class BasicType final : public SymType {
         return type;
     }
 
-    ValueReturnTypePtr toValueType(LLVMContextPtr context) override {
-        switch (type) {
-            case void_type: return context->getVoidType();
-            case int_type: return context->getIntType();
-            case char_type: return context->getCharType();
-        }
-        return nullptr;
-    }
+    ValueReturnTypePtr toValueType(LLVMContextPtr context) override;
 
     void print(std::ostream &out) override {
         if (constant_obj) {
@@ -156,9 +145,7 @@ class ArrayType final : public SymType {
         return false;
     }
 
-    ValueReturnTypePtr toValueType(LLVMContextPtr context) override {
-        return context->getArrayType(_element_type->toValueType(context), _size);
-    }
+    ValueReturnTypePtr toValueType(LLVMContextPtr context) override;
 
     void print(std::ostream &out) override {
         _element_type->print(out);
@@ -202,17 +189,8 @@ class FunctionType : public SymType {
     std::vector<std::shared_ptr<SymType>> get_params() {
         return _params;
     }
-    ValueReturnTypePtr get_return_type(LLVMContextPtr context) {
-        assert(typeid(*_return_type) == typeid(BasicType));
-        auto type = std::dynamic_pointer_cast<BasicType>(_return_type);
-        switch (type->get_basic_type()) {
-            case BasicType::void_type: return context->getVoidType();
-            case BasicType::int_type: return context->getIntType();
-            case BasicType::char_type: return context->getCharType();
-        }
-        return nullptr;
-    }
 
+    ValueReturnTypePtr get_return_type(LLVMContextPtr context);
     ValueReturnTypePtr toValueType(LLVMContextPtr context) override {
         return _return_type->toValueType(context);
     }

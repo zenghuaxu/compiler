@@ -4,8 +4,6 @@
 
 #ifndef MIPS_H
 #define MIPS_H
-#include <iostream>
-#include "../../llvm/include/llvm.h"
 
 class Data;
 using DataPtr = Data*;

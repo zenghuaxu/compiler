@@ -23,10 +23,6 @@
 #define GETCHAR    "GETCHARTK getchar"
 #define PRINTF     "PRINTFTK printf"
 
-#include <complex>
-#include <cmath>
-
-
 void Number::print(std::ostream &out) {
     out << token->toString() << std::endl;
     out << "<Number>" <<std::endl;

@@ -6,7 +6,6 @@
 #define TOKEN_H
 #include <map>
 #include <string>
-#include <utility>
 #include <iostream>
 
 enum class TokenType {

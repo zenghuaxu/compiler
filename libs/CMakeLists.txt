@@ -1,5 +1,5 @@
-add_subdirectory(frontend)
 add_subdirectory(llvm)
+add_subdirectory(frontend)
 add_subdirectory(mips)
 
 add_executable(Compiler

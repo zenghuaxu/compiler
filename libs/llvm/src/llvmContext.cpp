@@ -3,6 +3,7 @@
 //
 
 #include "../include/llvmContext.h"
+#include "../include/ir/function.h"
 
 void LLVMContext::print(std::ostream& out) {
     out << "declare i32 @getint()" << std::endl

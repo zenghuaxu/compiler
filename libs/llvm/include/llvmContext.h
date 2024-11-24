@@ -6,9 +6,6 @@
 #define LLVMCONTEXT_H
 
 #include "llvm.h"
-#include "ir/value.h"
-#include "valueReturnType.h"
-#include "ir/function.h"
 #include "ir/globalValue.h"
 
 class LLVMContext {

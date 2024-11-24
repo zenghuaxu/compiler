@@ -5,7 +5,7 @@
 #ifndef AST_H
 #define AST_H
 
-#include <assert.h>
+#include <cassert>
 #include <unordered_map>
 #include <vector>
 #include <variant>
