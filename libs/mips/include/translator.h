@@ -10,7 +10,7 @@
 
 class Translator {
     public:
-    Translator(MipsManagerPtr manager): manager(manager) {}
+    explicit Translator(MipsManagerPtr manager): manager(manager) {}
 
     static DataPtr translate(GlobalValuePtr value);
 
@@ -32,7 +32,7 @@ class Translator {
 
     void translate(TruncInstructionPtr trunc, std::vector<MipsInstPtr> &insts, DynamicOffsetPtr offset);
 
-    void translator(TruncInstructionPtr trunc, std::vector<MipsInstPtr> &insts);
+    void translate(ZextInstructionPtr zext, std::vector<MipsInstPtr> &insts, DynamicOffsetPtr offset);
 
     void translate(LoadInstructionPtr load, std::vector<MipsInstPtr> &insts, DynamicOffsetPtr offset);
 
@@ -63,11 +63,6 @@ class Translator {
     SwapRegPtr get_l_swap();
 
     SwapRegPtr get_r_swap();
-
-    RegPtr to_reg(ValuePtr value, std::vector<MipsInstPtr> &insts);
-
-    ValuePtr load_value(ValuePtr value, std::vector<MipsInstPtr> &insts);
-
 private:
     MipsManagerPtr manager;
 };

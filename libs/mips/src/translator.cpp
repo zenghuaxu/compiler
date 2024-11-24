@@ -96,8 +96,7 @@ void Translator::translate(BasicBlockPtr bb, std::vector<MipsInstPtr> &insts, Dy
         } else if (typeid(*inst) == typeid(JumpInstruction)) {
             translate(dynamic_cast<JumpInstructionPtr>(inst), insts);
         } else if (typeid(*inst) == typeid(ZextInstruction)) {
-            manager->value_reg_map[inst] = manager->value_reg_map.at(inst->use_list.at(0)->getValue());
-            //DO NOTHING; //TODO MEM ACC WRONG!!
+            translate(dynamic_cast<ZextInstructionPtr>(inst), insts, offset);
         } else if (typeid(*inst) == typeid(TruncInstruction)) {
             translate(dynamic_cast<TruncInstructionPtr>(inst), insts, offset);
         } else if (typeid(*inst) == typeid(CallInstruction)) {

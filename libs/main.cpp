@@ -72,7 +72,6 @@ int main() {
 
     auto mips = new MipsManager(module);
     mips->translate();
-    mips->print(std::cout);
 
     OUTPUT_OPEN(mips_out, mips.txt);
     mips->print(mips_out);

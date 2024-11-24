@@ -168,6 +168,21 @@ void Translator::translate(TruncInstructionPtr trunc, std::vector<MipsInstPtr> &
     reg_to_mem(trunc, insts, rd);
 }
 
+void Translator::translate(ZextInstructionPtr zext, std::vector<MipsInstPtr> &insts,
+    DynamicOffsetPtr offset) {
+    if (manager->value_reg_map.find(zext->use_list.at(0)->getValue()) ==
+                manager->value_reg_map.end()) {
+        RegPtr rd = alloc_rd(zext, offset);
+        new ICode(rd, rd, dynamic_cast<ConstantPtr>(zext->use_list.at(0)->getValue())->get_value()
+            , ICodeOp::li, insts);
+        release_reg(zext, false);
+    }
+    else {
+        manager->value_reg_map[zext] = manager->value_reg_map.at(zext->use_list.at(0)->getValue());
+    }
+    //TODO CHECK MEM ACCESS!!
+}
+
 void Translator::translate(LoadInstructionPtr load, std::vector<MipsInstPtr> &insts,
     DynamicOffsetPtr offset) {
     auto use = load->use_list.at(0)->getValue();
@@ -178,14 +193,15 @@ void Translator::translate(LoadInstructionPtr load, std::vector<MipsInstPtr> &in
     auto type = load->get_value_return_type();
     auto context = type->getContext();
 
-    auto IntType = context->getIntType();
+    auto CharType = context->getCharType();
+    auto BitType = context->getBitType();
 
-    if (type != IntType) {
-        new MemCode(rd, rs, nullptr, MemCodeOp::lbu, insts);//TODO OFF SET NULL
-    }
-    else {
+    if (type != CharType && type != BitType) {
         new MemCode(rd, rs, nullptr, MemCodeOp::lw, insts);//TODO OFF SET NULL
     }
+    else {
+        new MemCode(rd, rs, nullptr, MemCodeOp::lbu, insts);//TODO OFF SET NULL
+    }//TODO
 
     release_reg(use, true);
     reg_to_mem(load, insts, rd);
@@ -201,13 +217,14 @@ void Translator::translate(StoreInstructionPtr store, std::vector<MipsInstPtr> &
     auto type = value->get_value_return_type();
     auto context = type->getContext();
 
-    auto IntType = context->getIntType();
+    auto CharType = context->getCharType();
+    auto BitType = context->getBitType();
 
-    if (type != IntType) {
-        new MemCode(rt, base, nullptr, MemCodeOp::sb, insts);//TODO OFF SET NULL
+    if (type != CharType && type != BitType) {
+        new MemCode(rt, base, nullptr, MemCodeOp::sw, insts);//TODO OFF SET NULL
     }
     else {
-        new MemCode(rt, base, nullptr, MemCodeOp::sw, insts);//TODO OFF SET NULL
+        new MemCode(rt, base, nullptr, MemCodeOp::sb, insts);//TODO OFF SET NULL
     }
 
     release_reg(value, true);
@@ -303,7 +320,7 @@ void Translator::translate(CallInstructionPtr call, std::vector<MipsInstPtr> &in
     DynamicOffsetPtr pre_offset) {
     //STACK OPERATIONS
     new MemOffset(pre_offset, 0, 4);//上个栈空对齐
-    auto func_arg = call->function->args.size();
+    int func_arg = call->function->args.size();
     auto param_size = func_arg * 4;
     auto s_reg_size = cur_func->saved_reg_used_num * 4;
     auto stack_down = param_size + s_reg_size + 4;
@@ -317,31 +334,33 @@ void Translator::translate(CallInstructionPtr call, std::vector<MipsInstPtr> &in
         new RCode(rs, rs, manager->areg.at(i), RCodeOp::move, insts);
     }
     new ICode(manager->sp, manager->sp, -stack_down, ICodeOp::addiu, insts);
-    //ARGUMENT
-    for (int i = 4; i < func_arg; i++) {
-        auto rs = mem_to_reg(call->use_list.at(i)->getValue(), insts, true, true);
-        new MemCode(rs, manager->sp, new MemOffset(offset, 4, 4), MemCodeOp::sw,insts); //TODO CHECK SW is true?
-    }
+    //RA
+    new MemCode(manager->ra, manager->sp, new MemOffset(offset, 4, 4), MemCodeOp::sw,insts);
 
     //S_REG
     for (int i = 0; i < cur_func->saved_reg_used_num; i++) {
         new MemCode(manager->save.at(i), manager->sp, new MemOffset(offset, 4, 4), MemCodeOp::sw,insts);
     }
-    //RA
-    new MemCode(manager->ra, manager->sp, new MemOffset(offset, 4, 4), MemCodeOp::sw,insts);
+
+    //ARGUMENT
+    for (int i = func_arg - 1; i >= A_REG_NUM; i--) {
+        auto rs = mem_to_reg(call->use_list.at(i)->getValue(), insts, true, true);
+        new MemCode(rs, manager->sp, new MemOffset(offset, 4, 4), MemCodeOp::sw,insts); //TODO CHECK SW is true?
+    }
+    new MemOffset(offset, std::min(func_arg, A_REG_NUM) * 4, 4); //4 for 4 arg
 
     //跳转即可
     new JalCode(insts, call->function->name + "_begin");
 
-    auto position = offset->get_offset();
+    auto position = 4;
     //恢复现场，恢复RA和SAVED REG
     //RA
     new MemCode(manager->ra, manager->sp, new MemOffset(true, offset, position, 4), MemCodeOp::lw, insts);
-    position -= 4;
+    position += 4;
     //SAVED_REG
-    for (int i = cur_func->saved_reg_used_num - 1; i >= 0; i--) {
+    for (int i = 0; i < cur_func->saved_reg_used_num; i++) {
         new MemCode(manager->save.at(i), manager->sp, new MemOffset(true, offset, position, 4), MemCodeOp::lw,insts);
-        position -= 4;
+        position += 4;
     }
     //恢复栈空间
     new ICode(manager->sp, manager->sp, stack_down, ICodeOp::addiu, insts);//resume sp
