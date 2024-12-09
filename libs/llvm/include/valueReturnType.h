@@ -24,7 +24,7 @@ class ValueReturnType {
         return type_id < other.type_id;
     }
 
-    protected:
+protected:
     ValueReturnType(unsigned int type_id, LLVMContextPtr context):
         type_id(type_id), context(context) {}
 

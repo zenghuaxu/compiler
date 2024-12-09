@@ -30,18 +30,20 @@ DataPtr Translator::translate(GlobalValuePtr value) {
     }
 
     if (typeid(*value->global_value_type) == typeid(ValueArrayType)) {
-        type = dynamic_cast<ValueArrayTypePtr>(value->global_value_type);
+        auto array_type = dynamic_cast<ValueArrayTypePtr>(value->global_value_type);
         if (!value->init_vector.empty()) {
             int i;
             for (i = 0; i < value->init_vector.size(); i++) {
                 data->put_value(value->init_vector[i]);
             }
-            for (; i < type->get_length(); i++) {
+            for (; i < array_type->get_length(); i++) {
                 data->put_value(0);
             }
         }
         else {
-            data = new StringData(value->name, value->init_string);
+            assert(array_type->get_ele_type() == array_type->getContext()->getCharType());
+            data = new StringData(value->name, value->init_string,
+                array_type->get_length());
         }
     }
     else {
@@ -55,7 +57,7 @@ void Translator::translate(FunctionPtr function, std::vector<MipsInstPtr> &insts
     auto offset = new DynamicOffset(0);
     new Tag(insts, name + "_begin");
     //函数开始：申请栈空间，add sp什么的
-    new ICode(manager->sp, manager->sp, new MemOffset(true, offset, 0, 1), ICodeOp::subiu, insts);
+    new ICode(manager->sp, manager->sp, new MemOffset(false, offset, 0, 1), ICodeOp::subiu, insts);
 
     //函数开始：去拿到参数，即去取映射参数对应的mem或reg
     int i = 0;
@@ -64,7 +66,7 @@ void Translator::translate(FunctionPtr function, std::vector<MipsInstPtr> &insts
             manager->value_reg_map[arg] = manager->areg.at(i);
         }
         else {
-            manager->value_reg_map[arg] = new MemOffset(true, offset, -i * 4, 4);
+            manager->value_reg_map[arg] = new MemOffset(false, offset, -i * 4, 4);
         }
         i++;
     }
@@ -125,7 +127,7 @@ RegPtr Translator::mem_to_reg(ValuePtr value, std::vector<MipsInstPtr> &insts,
     if (typeid(*value) == typeid(GlobalValue)) {
         auto global_val = dynamic_cast<GlobalValuePtr>(value);
         auto reg = left ? get_l_swap() : get_r_swap();
-        new LaCode(reg, global_val->name, insts);
+        new LaCode(reg, "." + global_val->name, insts);
         return reg;
     }
     if (manager->value_reg_map.find(value) != manager->value_reg_map.end()) {
@@ -133,7 +135,7 @@ RegPtr Translator::mem_to_reg(ValuePtr value, std::vector<MipsInstPtr> &insts,
         if (typeid(*manager->value_reg_map.at(value)) == typeid(MemOffset)) {
             auto offset = dynamic_cast<MemOffsetPtr>(manager->value_reg_map.at(value));
             auto reg = left ? get_l_swap() : get_r_swap();
-            new MemCode(reg, manager->sp ,offset,
+            new MemCode(reg, manager->sp, offset,
                 offset->get_align_size() == 1 ? MemCodeOp::lbu : MemCodeOp::lw, insts);
             return reg;
         }

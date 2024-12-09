@@ -21,7 +21,7 @@ class Data {
 
 class ByteData: public Data {
     public:
-    ByteData(std::string &name): Data(), name(name), zero_initializer_num(0) {}
+    ByteData(std::string &name): Data(), name("." + name), zero_initializer_num(0) {}
 
     void put_value(int value) override {
         data.push_back(value);
@@ -52,7 +52,7 @@ class ByteData: public Data {
 
 class WordData: public Data {
     public:
-    WordData(std::string &name):Data(), name(name), zero_initializer_num(0) {}
+    WordData(std::string &name):Data(), name("." + name), zero_initializer_num(0) {}
 
     void put_value(int value) override {
         data.push_back(value);
@@ -96,17 +96,22 @@ const std::unordered_map<int, std::string> mips_value_to_char = {
 
 class StringData: public Data {
     public:
-    StringData(std::string &name, std::string &content):
-       Data(), name(name), content(content) {}
+    StringData(std::string &name, std::string &content, int length):
+       Data(), name("." + name), content(content), length(length) {}
 
     void print(std::ostream& out) override {
-        out << "\t" << name << ": .asciiz\"";
+        out << "\t" << name << ": .ascii\"";
         for(char & it : content) {
             if (mips_value_to_char.find(it) != mips_value_to_char.end()) {
                 out << mips_value_to_char.at(it);
             }
             else {
                 out << it;
+            }
+        }
+        if (content.size() < length) {
+            for (int i = content.size(); i < length; i++) {
+                out << "\\0";
             }
         }
         out << "\"";
@@ -118,6 +123,7 @@ class StringData: public Data {
     private:
     std::string name;
     std::string content;
+    int length;
 };
 
 #endif //DATA_H

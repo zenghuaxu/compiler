@@ -40,7 +40,7 @@ public:
         }
     }
 
-    int get_offset() { return sp_offset; }
+    [[nodiscard]] int get_offset() const { return sp_offset; }
 
 private:
     int sp_offset;
@@ -49,25 +49,31 @@ private:
 class MemOffset: public Reg {
 public:
     MemOffset(DynamicOffsetPtr offset, int byte_size, int align_size):
-        dynamic_offset(offset) {
+        dynamic_offset(offset), align_size(align_size) {
         offset->align_with(align_size);
         offset->insert_offset(byte_size);
         object_offset = offset->get_offset();
     }
-    MemOffset(bool get, DynamicOffsetPtr offset, int byte_pos, int align_size):
-        dynamic_offset(offset), object_offset(byte_pos), align_size(align_size) {}
+    MemOffset(bool new_pos, DynamicOffsetPtr offset, int byte_pos, int align_size):
+        new_pos(new_pos), dynamic_offset(offset), object_offset(byte_pos), align_size(align_size) {}
     [[nodiscard]] int get_align_size() const { return align_size;}
     //NOTICE:: IS ALSO OBJECT SIZE !!!
     int get_id() override {return 0;}
 
     void print(std::ostream &out) override {
-        out << dynamic_offset->get_offset() - object_offset;
+        if (new_pos) {
+            out << -object_offset;
+        }
+        else {
+            out << dynamic_offset->get_offset() - object_offset;
+        }
     }
 
 private:
     DynamicOffsetPtr dynamic_offset;
     int object_offset;
     int align_size;
+    bool new_pos = false;
 };
 
 class TmpReg: public Reg {

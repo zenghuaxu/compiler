@@ -35,7 +35,13 @@ void MipsManager::mem_alloc(ValuePtr value, MemOffsetPtr mem) {
 
 void MipsManager::translate() {
     for (auto it: module->getContext()->globals) {
-        data.push_back(translator->translate(it));
+        auto global_data = translator->translate(it);
+        if (typeid(*global_data) == typeid(WordData)) {
+            word_data.push_back(global_data);
+        }
+        else {
+            data.push_back(global_data);
+        }
     }
 
     translator->translate(module->getContext()->main_func, insts);

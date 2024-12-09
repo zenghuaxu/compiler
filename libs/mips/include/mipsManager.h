@@ -23,6 +23,10 @@ class MipsManager {
 
     void print(std::ostream &out) {
         out << ".data:" << std::endl;
+        for (auto it: word_data) {
+            it->print(out);
+            out << std::endl;
+        }
         for (auto it : data) {
             it->print(out);
             out << std::endl;
@@ -37,6 +41,7 @@ class MipsManager {
 
     private:
     ModulePtr module;
+    std::vector<DataPtr> word_data;
     std::vector<DataPtr> data;
     std::vector<MipsInstPtr> insts;
 

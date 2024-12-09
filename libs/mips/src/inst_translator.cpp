@@ -333,21 +333,21 @@ void Translator::translate(CallInstructionPtr call, std::vector<MipsInstPtr> &in
         auto rs = mem_to_reg(call->use_list.at(i)->getValue(), insts, true, true);
         new RCode(rs, rs, manager->areg.at(i), RCodeOp::move, insts);
     }
+    //ARGUMENT
+    for (int i = func_arg - 1; i >= A_REG_NUM; i--) {
+        auto rs = mem_to_reg(call->use_list.at(i)->getValue(), insts, true, true);
+        new MemCode(rs, manager->sp, new MemOffset(true, offset, stack_down - i * 4
+            , 4), MemCodeOp::sw,insts); //TODO CHECK SW is true?
+    }
+
     new ICode(manager->sp, manager->sp, -stack_down, ICodeOp::addiu, insts);
     //RA
     new MemCode(manager->ra, manager->sp, new MemOffset(offset, 4, 4), MemCodeOp::sw,insts);
-
     //S_REG
     for (int i = 0; i < cur_func->saved_reg_used_num; i++) {
         new MemCode(manager->save.at(i), manager->sp, new MemOffset(offset, 4, 4), MemCodeOp::sw,insts);
     }
-
-    //ARGUMENT
-    for (int i = func_arg - 1; i >= A_REG_NUM; i--) {
-        auto rs = mem_to_reg(call->use_list.at(i)->getValue(), insts, true, true);
-        new MemCode(rs, manager->sp, new MemOffset(offset, 4, 4), MemCodeOp::sw,insts); //TODO CHECK SW is true?
-    }
-    new MemOffset(offset, std::min(func_arg, A_REG_NUM) * 4, 4); //4 for 4 arg
+    new MemOffset(offset, func_arg * 4, 4); //just alloc, assignment has been done at first
 
     //跳转即可
     new JalCode(insts, call->function->name + "_begin");
@@ -355,11 +355,11 @@ void Translator::translate(CallInstructionPtr call, std::vector<MipsInstPtr> &in
     auto position = 4;
     //恢复现场，恢复RA和SAVED REG
     //RA
-    new MemCode(manager->ra, manager->sp, new MemOffset(true, offset, position, 4), MemCodeOp::lw, insts);
+    new MemCode(manager->ra, manager->sp, new MemOffset(false, offset, position, 4), MemCodeOp::lw, insts);
     position += 4;
     //SAVED_REG
     for (int i = 0; i < cur_func->saved_reg_used_num; i++) {
-        new MemCode(manager->save.at(i), manager->sp, new MemOffset(true, offset, position, 4), MemCodeOp::lw,insts);
+        new MemCode(manager->save.at(i), manager->sp, new MemOffset(false, offset, position, 4), MemCodeOp::lw,insts);
         position += 4;
     }
     //恢复栈空间
@@ -388,7 +388,7 @@ void Translator::translate(bool in_main, ReturnInstructionPtr ret, std::vector<M
         new RCode(rs, rs, manager->vreg.at(0), RCodeOp::move, insts);
     }
     //return：：释放栈空间
-    new ICode(manager->sp, manager->sp, new MemOffset(true, offset, 0, 1), ICodeOp::addiu, insts);
+    new ICode(manager->sp, manager->sp, new MemOffset(false, offset, 0, 1), ICodeOp::addiu, insts);
     //跳转jar
     if (in_main) {
         auto v0 = manager->vreg.at(0);
