@@ -65,16 +65,21 @@ int main() {
     }
     err.close();
 
+    module->mem2rg1();
     #ifdef LLVM_IR
     OUTPUT_OPEN(output, llvm_ir.txt);
     module->print(output);
+    output.close();
     #endif
+    module->mem2reg();
+    OUTPUT_OPEN(output1, llvm_ir_opt.txt);
+    module->print(output1);
+    output.close();
 
-    auto mips = new MipsManager(module);
-    mips->translate();
-
-    OUTPUT_OPEN(mips_out, mips.txt);
-    mips->print(mips_out);
-
+    // auto mips = new MipsManager(module);
+    // mips->translate();
+    //
+    // OUTPUT_OPEN(mips_out, mips.txt);
+    // mips->print(mips_out);
     return 0;
 }

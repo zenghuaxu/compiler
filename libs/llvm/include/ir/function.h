@@ -45,6 +45,22 @@ class Function:public Value{
     void global_register_map(std::vector<SaveRegPtr> &save_regs, std::unordered_map<ValuePtr, RegPtr> &map,
         DynamicOffsetPtr offset);
 
+    void emit_blocks();
+
+    void create_dom();
+
+    void dfs(BasicBlockPtr root, BasicBlockPtr prohibited, std::set<BasicBlockPtr> &reachable);
+
+    void create_dom_tree();
+
+    void cal_DF();
+
+    void insert_phi();
+
+    void rename();
+
+    void print_dom(std::ostream &os);
+
     std::string get_name() {
         return name;
     }
@@ -61,11 +77,16 @@ class Function:public Value{
         }
     }
 
+    BasicBlockPtr get_first_bb() {
+        return blocks.at(0);
+    }
+
     private:
     std::vector<ArgumentPtr> args;
     std::vector<BasicBlockPtr> blocks;
     std::string name;
     unsigned int current_object_id;
+    std::vector<std::set<BasicBlockPtr>> strict_dom_sets;
 
     std::vector<InstructionPtr> cross_block_variable;
     int saved_reg_used_num = 0;

@@ -63,6 +63,9 @@ class OutputInstruction;
 using OutputInstructionPtr = OutputInstruction*;
 class GetElementPtrInstruction;
 using GetElementPtrInstructionPtr = GetElementPtrInstruction*;
+class PhiInstruction;
+using PhiInstructionPtr = PhiInstruction*;
+
 
 class BasicBlock;
 using BasicBlockPtr = BasicBlock*;

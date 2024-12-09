@@ -67,6 +67,10 @@ class LLVMContext {
 
     void print(std::ostream &out);
 
+    void mem2reg();
+
+    void mem2reg1();
+
 private:
     std::vector<ValuePtr> values;
     std::vector<UsePtr> uses;

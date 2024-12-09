@@ -43,10 +43,17 @@ class Instruction: public User {
     bool contains_conflict(InstructionPtr instruction) {
         return conflicting_instructions.find(instruction) != conflicting_instructions.end();
     }
+    BasicBlockPtr get_basic_block() {
+        return basic_block;
+    }
+    void substitute_instruction(ValuePtr value);
 
-    private:
+    void delete_myself();
+
+private:
     unsigned int id = 0;
     void mark_id(unsigned int &id_alloc);
+    BasicBlockPtr basic_block;
 
     //活跃的块
     std::set<int> active_block_seq;
@@ -445,6 +452,18 @@ class OutputInstruction: public Instruction {
     private:
     ValueReturnTypePtr value_return_type;
     bool ch;
+};
+
+class PhiInstruction: public Instruction {
+    public:
+    PhiInstruction(AllocaInstructionPtr alloca_inst, BasicBlockPtr basic_block);
+
+    void add_option(ValuePtr value, BasicBlockPtr basic_block);
+    void print_full(std::ostream &out) override;
+
+private:
+    AllocaInstructionPtr alloca;
+    std::map<BasicBlockPtr, ValuePtr> options;
 };
 
 #endif //INSTRUCTIONS_H

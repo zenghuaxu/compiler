@@ -7,10 +7,14 @@
 Instruction::Instruction(ValueReturnTypePtr return_type, ValueType type, BasicBlockPtr basic_block):
         User(return_type, type) {
     if (type != ValueType::AllocaInst) {
-        basic_block->add_inst(this);
+        if (type != ValueType::PhiInst) {
+            basic_block->add_inst(this);
+            this->basic_block = basic_block;
+        }
     }
     else {
         basic_block->get_function()->insert_allocation(this);
+        this->basic_block = basic_block->get_function()->get_first_bb();
     }
     return_type->getContext()->SaveValue(this);
 }
@@ -159,4 +163,41 @@ GetElementPtrInstruction::GetElementPtrInstruction(ValuePtr base, ValuePtr offse
     right_val = base->get_value_return_type();
     this->add_use(new Use(this, base));
     this->add_use(new Use(this, offset));
+}
+
+PhiInstruction::PhiInstruction(AllocaInstructionPtr alloca_inst, BasicBlockPtr basic_block):
+    Instruction(alloca_inst->get_object_type(), ValueType::PhiInst, basic_block){
+    alloca = alloca_inst;
+    //do not use the upper alloca
+}
+
+void PhiInstruction::print_full(std::ostream &out) {
+    print(out);
+    out << " = phi ";
+    alloca->get_object_type()->print(out);
+    out << " ";
+    auto it = options.begin();
+    while (it != options.end()) {
+        out << "[";
+        it->second->print(out);
+        out << ", %";
+        it->first->print(out);
+        out << "]";
+        if (std::next(it) != options.end()) {
+            out << ", ";
+        }
+        it++;
+    }
+    //this->alloca->print(out);
+}
+
+void PhiInstruction::add_option(ValuePtr value, BasicBlockPtr basic_block) {
+    options[basic_block] = value;
+}
+
+//JUST FOR LOAD!!! OTHERS MAY ERR
+void Instruction::substitute_instruction(ValuePtr value) {
+    for (auto user:user_list) {
+        user->replace_use(this, value);
+    }
 }

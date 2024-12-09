@@ -20,3 +20,27 @@ void LLVMContext::print(std::ostream& out) {
     }
     main_func->print(out);
 }
+
+void LLVMContext::mem2reg() {
+    for (auto func: functions) {
+        func->create_dom();
+        func->create_dom_tree();
+        func->cal_DF();
+        func->insert_phi();
+        func->rename();
+    }
+
+    main_func->create_dom();
+    main_func->create_dom_tree();
+    main_func->cal_DF();
+    main_func->insert_phi();
+    main_func->rename();
+}
+
+void LLVMContext::mem2reg1() {
+    for (auto func: functions) {
+        func->emit_blocks();
+    }
+
+    main_func->emit_blocks();
+}
