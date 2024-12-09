@@ -60,6 +60,10 @@ class BasicBlock: public User{
         delete this;
     }
 
+    std::vector<BasicBlockPtr> get_goto() {
+        return goto_basic_blocks;
+    }
+
     ~BasicBlock() override = default;
 
     void mark_active(int i);
@@ -67,16 +71,45 @@ class BasicBlock: public User{
     void fetch_cross(std::vector<InstructionPtr> &cross);
     void create_use_def();
 
+    bool empty_father();
+
+    void set_dom_set(std::set<BasicBlockPtr> set);
+    std::set<BasicBlockPtr> get_strict_dom() { return strict_dom_set;}
+    std::set<BasicBlockPtr> get_df() { return DF_set; }
+    BasicBlockPtr get_idom() {return idom;}
+    void add_dominator(BasicBlockPtr ptr);
+    void cal_idom();
+    void print_dir(std::ostream &ostream);
+    void print_df(std::ostream &ostream);
+    void add_DF_ele(BasicBlockPtr ptr);
+
+    void insert_phi_instruction(AllocaInstructionPtr);
+
+    void rename(std::map<AllocaInstructionPtr, std::vector<ValuePtr>> &defs);
+
+    void delete_inst(InstructionPtr inst);
+
+    std::vector<UsePtr> get_use_list() {  return use_list; }
+
 private:
     FunctionPtr function;
     std::vector<BasicBlockPtr> goto_basic_blocks;
     std::vector<BasicBlockPtr> father_basic_blocks;
     unsigned int id = -1;
+    std::map<AllocaInstructionPtr, PhiInstructionPtr> phi_instructions;
 
+    //寄存器分配：
     std::set<InstructionPtr> use_set;
     std::set<InstructionPtr> def_set;
     std::set<InstructionPtr> in_set;
     std::set<InstructionPtr> out_set;
+
+    //支配集计算：
+    BasicBlockPtr idom = nullptr;
+    std::set<BasicBlockPtr> strict_dominators;
+    std::set<BasicBlockPtr> strict_dom_set;
+    std::set<BasicBlockPtr> direct_dom_set;
+    std::set<BasicBlockPtr> DF_set;
 
     void insert_father(BasicBlockPtr basic_block) {
         father_basic_blocks.push_back(basic_block);

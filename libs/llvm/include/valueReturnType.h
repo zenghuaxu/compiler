@@ -12,9 +12,12 @@ class ValueReturnType {
     friend class LLVMContext;
 
     public:
+    virtual ~ValueReturnType() = default;
+
     LLVMContextPtr getContext() {
         return context;
     }
+    virtual bool isScalar() = 0;
     virtual bool isInt() = 0;
     virtual void print(std::ostream &out) = 0;
     virtual ValueReturnTypePtr get_ele_type() = 0;
@@ -37,6 +40,7 @@ class BitType: public ValueReturnType {
     friend class LLVMContext;
 
     public:
+    bool isScalar() override {return true;}
     bool isInt() override { return false; }
     void print(std::ostream &out) override {
         out << "i1";
@@ -54,6 +58,7 @@ class CharType : public ValueReturnType {
     friend class LLVMContext;
 
     public:
+    bool isScalar() override { return true; }
     bool isInt() override {return false;}
     void print(std::ostream &out) override {
         out << "i8";
@@ -71,6 +76,7 @@ class IntType : public ValueReturnType {
     friend class LLVMContext;
 
     public:
+    bool isScalar() override { return true; }
     bool isInt() override {return true;}
     void print(std::ostream &out) override {
         out << "i32";
@@ -88,6 +94,7 @@ class VoidType : public ValueReturnType {
     friend class LLVMContext;
 
     public:
+    bool isScalar() override { return true; }
     bool isInt() override {return false;}
     void print(std::ostream &out) override {
         out << "void";
@@ -105,6 +112,7 @@ class PointerType : public ValueReturnType {
     friend class LLVMContext;
 
     public:
+    bool isScalar() override { return true; }
     bool isInt() override {return false;}
     ValueReturnTypePtr get_referenced_type() { return referenced_type; }
     void print(std::ostream &out) override {
@@ -127,6 +135,7 @@ class ValueArrayType : public ValueReturnType {
     friend class LLVMContext;
 
     public:
+    bool isScalar() override { return false;}
     bool isInt() override {return false;}
     [[nodiscard]] unsigned int get_size() const { return size; }
     void print(std::ostream &out) override {

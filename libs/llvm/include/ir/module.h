@@ -22,6 +22,8 @@ class Module {
         context->print(out);
     }
 
+    void mem2reg() {context->mem2reg();}
+    void mem2rg1() {context->mem2reg1();}
     private:
     LLVMContextPtr context;
 };

@@ -2,6 +2,7 @@
 // Created by LENOVO on 2024/11/14.
 //
 #include <algorithm>
+#include <utility>
 
 #include "../../include/ir/basicBlock.h"
 #include "../../include/ir/constant.h"
@@ -18,6 +19,10 @@ void BasicBlock::mark_id(unsigned int &id_alloc) {
         id = id_alloc;
         id_alloc++;
     }
+    for (auto phi: phi_instructions) {
+        phi.second->mark_id(id_alloc);
+        id_alloc++;
+    }
     for (auto inst: use_list) {
         dynamic_cast<InstructionPtr>(inst->getValue())->mark_id(id_alloc);
         id_alloc++;
@@ -31,6 +36,11 @@ void BasicBlock::print(std::ostream &out) {
 void BasicBlock::print_full(std::ostream &out) {
     print(out);
     out << ":" << std::endl;
+    for (auto phi:phi_instructions) {
+        out << "\t";
+        phi.second->print_full(out);
+        out << std::endl;
+    }
     for (auto inst: use_list) {
         out << "\t";
         dynamic_cast<InstructionPtr>(inst->getValue())->print_full(out);
@@ -128,3 +138,146 @@ void BasicBlock::create_use_def() {
     }
 }
 
+bool BasicBlock::empty_father() {
+    return father_basic_blocks.empty();
+}
+
+void BasicBlock::set_dom_set(std::set<BasicBlockPtr> set) {
+    strict_dom_set = std::move(set);
+}
+
+void BasicBlock::add_dominator(BasicBlockPtr ptr) {
+    strict_dominators.insert(ptr);
+}
+
+void BasicBlock::cal_idom() {
+    for (auto item : strict_dominators) {
+        //all dominators
+        //check which do not dominate dominators
+        auto flag = 1;
+        for (auto dominate: item->strict_dom_set) {
+            if (strict_dominators.find(dominate) != strict_dominators.end()) {
+                flag = 0;
+            }
+        }
+        if (flag) {
+            idom = item;
+            item->direct_dom_set.insert(this);
+            break;
+        }
+    }
+}
+
+void BasicBlock::add_DF_ele(BasicBlockPtr ptr) {
+    DF_set.insert(ptr);
+}
+
+void BasicBlock::print_dir(std::ostream & ostream) {
+    ostream << "dom_tree_child of ";
+    print(ostream);
+    ostream << ':';
+    for (auto block: direct_dom_set) {
+        block->print(ostream);
+        ostream << ' ';
+    }
+}
+
+
+void BasicBlock::print_df(std::ostream & ostream) {
+    ostream << "df of ";
+    print(ostream);
+    ostream << ':';
+    for (auto block: DF_set) {
+        block->print(ostream);
+        ostream << ' ';
+    }
+}
+
+void BasicBlock::insert_phi_instruction(AllocaInstructionPtr alloca) {
+    if (phi_instructions.find(alloca) == phi_instructions.end()) {
+        auto phi = new PhiInstruction(alloca, this);
+        phi_instructions[alloca] = phi;
+    }
+}
+
+void BasicBlock::rename(std::map<AllocaInstructionPtr, std::vector<ValuePtr>> &defs) {
+    std::map<AllocaInstructionPtr, ValuePtr> current_bb_def;
+    for (auto phi:phi_instructions) {
+        current_bb_def[phi.first] = phi.second;
+    }
+    auto it = use_list.begin();
+    while (it != use_list.end()) {
+        auto inst = dynamic_cast<InstructionPtr>((*it)->getValue());
+        if (typeid(*inst) == typeid(LoadInstruction)) {
+            auto load_inst = dynamic_cast<LoadInstructionPtr>(inst);
+            auto addr = dynamic_cast<AllocaInstructionPtr>(load_inst->use_list.at(0)->getValue());
+            if (addr) {
+                if (current_bb_def.find(addr) != current_bb_def.end()) {
+                    load_inst->substitute_instruction(current_bb_def[addr]);
+                }
+                else if (defs.find(addr) != defs.end()) {
+                    load_inst->substitute_instruction(defs[addr].back());
+                }
+                else {
+                    load_inst->substitute_instruction(new Constant(0,
+                        addr->get_object_type()->getContext()->getIntType()));
+                }
+                it = use_list.erase(it);
+            }
+            else { it++; }
+        }
+        else if (typeid(*inst) == typeid(StoreInstruction)) {
+            auto store = dynamic_cast<StoreInstructionPtr>(inst);
+            auto addr = store->use_list.at(1)->getValue();
+            if (typeid(*addr) == typeid(AllocaInstruction)) {
+                auto alloca = dynamic_cast<AllocaInstruction*>(addr);
+                current_bb_def[alloca] = store->use_list.at(0)->getValue();
+                it = use_list.erase(it);
+            }
+            else { it++; }
+        }
+        else if (typeid(*inst) == typeid(AllocaInstruction)) {
+            auto alloca = dynamic_cast<AllocaInstructionPtr>(inst);
+            if (alloca->get_object_type()->isScalar()) {
+                it = use_list.erase(it);
+            }
+            else { it++; }
+        }
+        else { it++; }
+    }
+    //fill phi
+    for (auto bb: goto_basic_blocks) {
+        for (auto inst: bb->phi_instructions) {
+            auto addr = inst.first;
+            if (current_bb_def.find(addr) != current_bb_def.end()) {
+                inst.second->add_option(current_bb_def[addr], this);
+            }
+            else if (defs.find(addr) != defs.end()) {
+                inst.second->add_option(defs[addr].back(), this);
+            }
+            else {
+                inst.second->add_option(new Constant(0,
+                    addr->get_object_type()->getContext()->getIntType()), this);
+            }
+        }
+    }
+
+    //push chain stack
+    for (auto item:current_bb_def) {
+        if (defs.find(item.first) == defs.end()) {
+            defs[item.first] = {};
+        }
+        defs[item.first].push_back(item.second);
+    }
+    //dsf
+    for (auto bb: direct_dom_set) {
+        bb->rename(defs);
+    }
+    //pop chain
+    for (auto item:current_bb_def) {
+        defs[item.first].pop_back();
+        if (defs[item.first].empty()) {
+            defs.erase(item.first);
+        }
+    }
+}

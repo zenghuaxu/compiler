@@ -7,9 +7,10 @@
 #include "../../../mips/include/mips.h"
 
 #include <algorithm>
+#include <vector>
 
 Function::Function(ValueReturnTypePtr return_type, bool is_main,
-    std::string name):
+                   std::string name):
     Value(return_type, ValueType::Function) {
     if (is_main) {return_type->getContext()->SaveMainFunction(this);}
     else {return_type->getContext()->SaveFunction(this);}
@@ -204,4 +205,134 @@ void Function::global_register_map(std::vector<SaveRegPtr> &save_regs,
         std::cout << " in func " << name <<" map to save" << it.second->get_id() << std::endl;
     }
 #endif
+}
+
+void Function::emit_blocks() {
+    std::set<BasicBlockPtr> all;
+    for (auto item: blocks) {
+        all.insert(item);
+    }
+    std::set<BasicBlockPtr> reachable;
+    dfs(blocks.at(0), nullptr, reachable);
+    std::set<BasicBlockPtr> emit;
+    std::set_difference(all.begin(), all.end(),
+        reachable.begin(), reachable.end(),
+        std::inserter(emit, emit.begin()));
+    for (auto it: emit) {
+        auto emitted = std::find(blocks.begin(), blocks.end(), it);
+        if (emitted != blocks.end()) {
+            blocks.erase(emitted);
+        }
+    }
+}
+
+void Function::create_dom() {
+    std::set<BasicBlockPtr> all;
+    for (auto item: blocks) {
+        all.insert(item);
+    }
+    for (auto & block : blocks) {
+        auto prohibited = block;
+        std::set<BasicBlockPtr> reachable, dom;
+        dfs(blocks.at(0), prohibited, reachable);
+        std::set_difference(all.begin(), all.end(),
+            reachable.begin(), reachable.end(),
+            std::inserter(dom, dom.end()));
+        dom.erase(block);
+        block->set_dom_set(dom);
+        for (auto item:dom) {
+            item->add_dominator(block);
+        }
+        //支配和被支配
+        ///debug new
+        std::cout<< "dom of ";
+        block->print(std::cout);
+        std::cout << ":";
+        for (auto item:dom) {
+            item->print(std::cout);
+            std::cout << " ";
+        }
+        std::cout << std::endl;
+    }
+}
+
+void Function::dfs(BasicBlockPtr root, BasicBlockPtr prohibited,
+    std::set<BasicBlockPtr>& reachable) {
+    if (root == prohibited) {
+        return;
+    }
+    reachable.insert(root);
+    for (auto item: root->get_goto()) {
+        if (reachable.find(item) == reachable.end()) {
+            dfs(item, prohibited, reachable);
+        }
+    }
+}
+
+void Function::create_dom_tree() {
+    for (auto block:blocks) {
+        block->cal_idom();
+    }
+    ///debug new
+    for (auto block:blocks) {
+        block->print_dir(std::cout);
+        std::cout << std::endl;
+    }
+}
+
+void Function::cal_DF() {
+    for (auto block:blocks) {
+        // all (a,b)
+        for(auto b : block->get_goto()) {
+            auto x = block;
+            auto set = x->get_strict_dom();
+            while (x && set.find(b) == set.end()) {
+                //x not strictly dominate b
+                x->add_DF_ele(b);
+                x = x->get_idom();
+                if (x) {
+                    set = x->get_strict_dom();
+                }
+            }
+        }
+    }
+    ///debug new
+    for (auto block:blocks) {
+        block->print_df(std::cout);
+        std::cout << std::endl;
+    }
+}
+
+void Function::insert_phi() {
+    auto var_block = blocks.at(0);
+    for (auto use : var_block->get_use_list()) {
+        auto inst = dynamic_cast<AllocaInstructionPtr>(use->getValue());
+        if (inst && inst->get_object_type()->isScalar()) {
+            std::set<BasicBlockPtr> F_phi_added;
+            std::vector<BasicBlockPtr> W_defs;
+            for (auto user:inst->get_user_list()) {
+                if (typeid(*user) == typeid(StoreInstruction)) {
+                    auto store_inst = dynamic_cast<StoreInstructionPtr>(user);
+                    W_defs.push_back(store_inst->get_basic_block());
+                }
+            }
+            for(int i = 0; i < W_defs.size(); i++) {
+                for (auto bb: W_defs.at(i)->get_df()) {
+                    if (F_phi_added.find(bb) == F_phi_added.end()) {
+                        bb->insert_phi_instruction(inst);
+                        F_phi_added.insert(bb);
+                        if (std::find(W_defs.begin(), W_defs.end(), bb) == W_defs.end()) {
+                            W_defs.push_back(bb);
+                        }
+                    }
+                }
+            }
+        }
+        //mem2reg
+    }
+}
+
+void Function::rename() {
+    std::map<AllocaInstructionPtr, std::vector<ValuePtr>> defs;
+    blocks.at(0)->rename(defs);
 }

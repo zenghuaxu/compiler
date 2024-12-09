@@ -35,6 +35,7 @@ enum class ValueType {
     UnaryInst,
     ZextInst,
     TruncInst,
+    PhiInst,
 };
 
 class Value {
@@ -67,6 +68,7 @@ class Value {
     void add_user(UserPtr user) {
         user_list.emplace_back(user);
     }
+    std::vector<UserPtr> get_user_list() { return user_list;}
 
     private:
     ValueReturnTypePtr return_type;
