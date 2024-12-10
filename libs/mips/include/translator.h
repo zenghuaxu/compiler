@@ -46,11 +46,15 @@ class Translator {
 
     void translate(bool in_main, ReturnInstructionPtr ret, std::vector<MipsInstPtr> &insts, DynamicOffsetPtr offset);
 
+    void translate(PCInstructionPtr pc, std::vector<MipsInstPtr> &insts, DynamicOffsetPtr offset);
+
+    int cal(int left, int right, BinaryOp op);
+
     void translate(GetElementPtrInstructionPtr getelement, std::vector<MipsInstPtr> &insts, DynamicOffsetPtr offset);
 
     RegPtr mem_to_reg(ValuePtr value, std::vector<MipsInstPtr> &insts, bool left, bool const_to_reg);
 
-    RegPtr alloc_rd(InstructionPtr inst, DynamicOffsetPtr offset);
+    RegPtr alloc_rd(ValuePtr inst, DynamicOffsetPtr offset);
 
     void reg_to_mem(ValuePtr value, std::vector<MipsInstPtr> &insts, RegPtr reg);
 

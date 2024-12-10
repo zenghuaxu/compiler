@@ -5,6 +5,7 @@
 #ifndef LLVM_H
 #define LLVM_H
 #include <memory>
+#include <variant>
 
 class Module;
 using ModulePtr = std::shared_ptr<Module>;
@@ -65,7 +66,8 @@ class GetElementPtrInstruction;
 using GetElementPtrInstructionPtr = GetElementPtrInstruction*;
 class PhiInstruction;
 using PhiInstructionPtr = PhiInstruction*;
-
+class PCInstruction;
+using PCInstructionPtr = PCInstruction*;
 
 class BasicBlock;
 using BasicBlockPtr = BasicBlock*;
@@ -84,4 +86,5 @@ using ConstantPtr = Constant*;
 class Use;
 using UsePtr = Use*;
 
+using Variable = std::variant<InstructionPtr, ArgumentPtr>;
 #endif //LLVM_H

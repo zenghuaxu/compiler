@@ -4,9 +4,9 @@
 
 #ifndef USER_H
 #define USER_H
-#include <memory>
 #include <vector>
 
+#include "../llvm.h"
 #include "use.h"
 #include "value.h"
 
@@ -21,11 +21,13 @@ class User: public Value {
         use->getValue()->add_user(this);
     }
 
+    void delete_use(UsePtr use);
     //TODO CHECK
     void replace_use(ValuePtr old_value, ValuePtr new_value) {
         for (auto & i : use_list) {
             if (i->getValue() == old_value) {
                 i = new Use(this, new_value);
+                break;
             }
         }
     }

@@ -10,6 +10,8 @@
 #include "../../frontend/include/visitor.h"
 #include "../../llvm/include/llvmContext.h"
 #include "../../llvm/include/ir/constant.h"
+#include "../../llvm/include/ir/function.h"
+#include "../../llvm/include/ir/tmp_value.h"
 #include "../include/mipsInst.h"
 
 void Translator::translate(AllocaInstructionPtr alloca_instruction, std::vector<MipsInstPtr> &insts,
@@ -40,14 +42,23 @@ void Translator::translate(UnaryOpInstructionPtr unary, std::vector<MipsInstPtr>
     RegPtr rd = alloc_rd(unary, offset);
 
     //core inst
-    assert(rt);
-    if (unary->op == UnaryOpType::NEG) {
-        new RCode(manager->zero, rt, rd, BinaryOp::SUB, insts);
+    if (!rt) {
+        auto imm = dynamic_cast<ConstantPtr>(use)->get_value();
+        if (unary->op == UnaryOpType::NEG) {
+            new ICode(nullptr, rd, -imm, ICodeOp::li, insts);
+        }
+        else {
+            new ICode(nullptr, rd, imm == 0, ICodeOp::li, insts);
+        }
     }
     else {
-        new RCode(manager->zero, rt, rd, CompOp::EQ, insts);
+        if (unary->op == UnaryOpType::NEG) {
+            new RCode(manager->zero, rt, rd, BinaryOp::SUB, insts);
+        }
+        else {
+            new RCode(manager->zero, rt, rd, CompOp::EQ, insts);
+        }
     }
-
     //tailing
     release_reg(use, true);
     reg_to_mem(unary, insts, rd);
@@ -64,7 +75,13 @@ void Translator::translate(BinaryInstructionPtr bi, std::vector<MipsInstPtr> &in
     RegPtr rd = alloc_rd(bi, offset);
 
     //core inst
-    if (!rs /*IMM*/) {
+    if (!rs && !rt) {
+        auto imm_l = dynamic_cast<ConstantPtr>(left)->get_value();
+        auto imm_r = dynamic_cast<ConstantPtr>(right)->get_value();
+        auto imm = cal(imm_l, imm_r, bi->op);
+        new ICode(nullptr, rd, imm, ICodeOp::li, insts);
+    }
+    else if (!rs /*IMM*/) {
         auto imm = dynamic_cast<ConstantPtr>(left)->get_value();
         new ICode(nullptr, rd, imm, ICodeOp::li, insts);
         new RCode(rd, rt, rd, bi->getBinaryOp(), insts);
@@ -149,7 +166,7 @@ void Translator::translate(TruncInstructionPtr trunc, std::vector<MipsInstPtr> &
     DynamicOffsetPtr offset) {
     auto use = trunc->use_list.at(0)->getValue();
 
-    auto rs = mem_to_reg(use, insts, true, false);
+    auto rs = mem_to_reg(use, insts, true, true);
     RegPtr rd = alloc_rd(trunc, offset);
 
     auto type = trunc->get_value_return_type();
@@ -289,6 +306,7 @@ void Translator::translate(GetElementPtrInstructionPtr getelement, std::vector<M
 
     RegPtr rd = alloc_rd(getelement, dy_offset);
     assert(rs);
+    //i32
     if (dynamic_cast<PointerTypePtr>(getelement->right_val)
         ->get_referenced_type()->get_ele_type() ==
         getelement->right_val->getContext()->getIntType()) {
@@ -297,10 +315,11 @@ void Translator::translate(GetElementPtrInstructionPtr getelement, std::vector<M
             new ICode(rs, rd, imm * 4, ICodeOp::addiu, insts);
         }
         else {
-            new ICode(rt, rt, 4, ICodeOp::mul, insts);
-            new RCode(rs, rt, rd, RCodeOp::addu, insts);
+            new ICode(rt, rd, 4, ICodeOp::mul, insts);
+            new RCode(rs, rd, rd, RCodeOp::addu, insts);
         }
     }
+    //i8
     else {
         if (!rt) {
             auto imm = dynamic_cast<ConstantPtr>(offset)->get_value();
@@ -396,5 +415,82 @@ void Translator::translate(bool in_main, ReturnInstructionPtr ret, std::vector<M
         new SysCallCode(insts);
     } else {
         new JrCode(manager->ra, insts);
+    }
+}
+
+void Translator::translate(PCInstructionPtr pc, std::vector<MipsInstPtr> &insts,
+    DynamicOffsetPtr offset) {
+    std::set<PCNodePtr> f_nodes;
+    while(f_nodes.size() < pc->nodes.size()) {
+        auto flag = 1;
+        for (auto node: pc->nodes) {
+            if (f_nodes.find(node) != f_nodes.end()) { continue; }
+            if (node->ancestor.empty()) {
+                f_nodes.insert(node);
+                continue;
+            }
+            if (node->children.empty()) {
+                auto phi = dynamic_cast<PhiInstructionPtr>(node->value);
+                assert(phi != nullptr);
+                auto rd = alloc_rd(phi, offset);
+                //assert: just 1
+                for (auto pre:node->ancestor) {
+                    auto from = pre->value;
+                    //TODO CHECK REALY ALLOCED??
+                    auto rs = mem_to_reg(from, insts, true, false);
+                    if (rs) {
+                        new RCode(rs, rs, rd, RCodeOp::move, insts);
+                    }
+                    else {
+                        auto imm = dynamic_cast<ConstantPtr>(from)->get_value();
+                        new ICode(nullptr, rd, imm, ICodeOp::li, insts);
+                    }
+                    release_reg(from, true);
+                    reg_to_mem(phi, insts, rd);
+                    pre->delete_ancestor(node);
+                }
+                f_nodes.insert(node);
+                flag = 0;
+                break;
+            }
+        }
+        if (flag) {
+            for (auto node: pc->nodes) {
+                if (f_nodes.find(node) != f_nodes.end()) { continue; }
+                //delete origin
+                auto it = node->children.begin();
+                node->children.erase(it);
+                auto to = dynamic_cast<PhiInstructionPtr>((*it)->value);
+                (*it)->delete_ancestor(node);
+
+                //add new
+                auto tmp = new TmpValue();
+                pc->add_edge(tmp, to);
+
+                //add move, a-> a'
+                auto rd = alloc_rd(tmp, offset);
+                auto rs = mem_to_reg(node->value, insts, true, false);
+                new RCode(rs, rs, rd, RCodeOp::move, insts);
+                reg_to_mem(tmp, insts, rd);
+                break;
+            }
+        }
+    }
+}
+
+int Translator::cal(int left, int right, BinaryOp op) {
+    switch (op) {
+        case BinaryOp::ADD:
+            return left + right;
+        case BinaryOp::SUB:
+            return left - right;
+        case BinaryOp::MUL:
+            return left * right;
+        case BinaryOp::DIV:
+            return left / right;
+        case BinaryOp::MOD:
+            return left % right;
+        default:
+            throw std::invalid_argument("Unknown BinaryOp");
     }
 }

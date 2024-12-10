@@ -7,6 +7,8 @@
 #include "../../llvm/include/ir/module.h"
 #include "../../llvm/include/ir/constant.h"
 #include "../../llvm/include/ir/instructions.h"
+#include "../../llvm/include/ir/basicBlock.h"
+#include "../../llvm/include/ir/function.h"
 
 template <class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
 template <class... Ts> overloaded(Ts...) -> overloaded<Ts...>;

@@ -4,8 +4,6 @@
 
 #ifndef VALUE_H
 #define VALUE_H
-#include <assert.h>
-
 #include "vector"
 
 #include "../llvm.h"
@@ -36,6 +34,8 @@ enum class ValueType {
     ZextInst,
     TruncInst,
     PhiInst,
+    PCInst,
+    tmp,
 };
 
 class Value {
@@ -68,6 +68,9 @@ class Value {
     void add_user(UserPtr user) {
         user_list.emplace_back(user);
     }
+    void delete_user(UserPtr user);
+
+
     std::vector<UserPtr> get_user_list() { return user_list;}
 
     private:

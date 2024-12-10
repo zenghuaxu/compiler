@@ -69,7 +69,9 @@ class LLVMContext {
 
     void mem2reg();
 
-    void mem2reg1();
+    void emit_bb();
+
+    void delete_phi();
 
 private:
     std::vector<ValuePtr> values;

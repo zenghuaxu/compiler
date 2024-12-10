@@ -5,10 +5,10 @@
 #define INSTRUCTIONS_H
 #include <unordered_map>
 #include <cassert>
+#include <set>
 
 #include "../../../frontend/include/token.h"
 #include "../llvm.h"
-#include "function.h"
 #include "user.h"
 #include "../llvmContext.h"
 #include "../valueReturnType.h"
@@ -34,13 +34,13 @@ class Instruction: public User {
     std::set<int> get_active_block_seq() {
         return active_block_seq;
     }
-    void add_conflict(InstructionPtr instruction) {
+    void add_conflict(Variable instruction) {
         conflicting_instructions.insert(instruction);
     }
     int get_conflict_count() {
         return conflicting_instructions.size();
     }
-    bool contains_conflict(InstructionPtr instruction) {
+    bool contains_conflict(Variable instruction) {
         return conflicting_instructions.find(instruction) != conflicting_instructions.end();
     }
     BasicBlockPtr get_basic_block() {
@@ -60,7 +60,7 @@ private:
     //跨块活跃
     bool is_global = false;
     //冲突的全局变量
-    std::set<InstructionPtr> conflicting_instructions;
+    std::set<Variable> conflicting_instructions;
     int map_times = 0;
 
     bool add_map_and_try_release() {
@@ -220,6 +220,8 @@ class BranchInstruction: public Instruction {
     BranchInstruction(ValuePtr condition, BasicBlockPtr true_block, BasicBlockPtr false_block,
         BasicBlockPtr current_block);
 
+    void substitute(BasicBlockPtr old_block, BasicBlockPtr new_block);
+
     void print_full(std::ostream &out) override {
         out << "br i1 ";
         use_list.at(0)->getValue()->print(out);
@@ -235,6 +237,8 @@ class JumpInstruction:public Instruction {
 
     public:
     JumpInstruction(BasicBlockPtr jump_block, BasicBlockPtr current_block);
+
+    void substitute(BasicBlockPtr old, BasicBlockPtr);
 
     void print_full(std::ostream &out) override {
         out << "br label %";
@@ -457,13 +461,46 @@ class OutputInstruction: public Instruction {
 class PhiInstruction: public Instruction {
     public:
     PhiInstruction(AllocaInstructionPtr alloca_inst, BasicBlockPtr basic_block);
-
+    std::map<BasicBlockPtr, ValuePtr> get_options() { return options; }
     void add_option(ValuePtr value, BasicBlockPtr basic_block);
     void print_full(std::ostream &out) override;
 
 private:
     AllocaInstructionPtr alloca;
     std::map<BasicBlockPtr, ValuePtr> options;
+};
+
+class PCNode;
+using PCNodePtr = PCNode*;
+class PCInstruction: public Instruction {
+    friend class Translator;
+public:
+    explicit PCInstruction(BasicBlockPtr basic_block);
+    void add_edge(ValuePtr from, PhiInstructionPtr to);
+    std::set<InstructionPtr> get_def() {return def;}
+    std::set<Variable> get_use() {return use;}
+
+    void print_full(std::ostream &out) override;
+private:
+    std::set<InstructionPtr> def;
+    std::set<Variable> use;
+    std::vector<PCNode*> nodes;
+};
+
+class PCNode {
+    friend class Translator;
+    friend class PCInstruction;
+public:
+    explicit PCNode(ValuePtr value);
+    bool operator==(ValuePtr other);
+    void insert_child(PCNode* pc_node) {children.insert(pc_node);}
+    void insert_ancestor(PCNode* pc_node) {ancestor.insert(pc_node);}
+    void delete_child(PCNodePtr pc_node) {children.erase(pc_node);}
+    void delete_ancestor(PCNodePtr pc_node) {children.erase(pc_node);}
+private:
+    ValuePtr value;
+    std::set<PCNodePtr> children;
+    std::set<PCNodePtr> ancestor;
 };
 
 #endif //INSTRUCTIONS_H

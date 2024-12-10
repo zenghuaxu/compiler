@@ -8,11 +8,15 @@
 #include "../include/mipsReg.h"
 #include "../include/translator.h"
 
-#include "../../frontend/include/visitor.h"
+#include "../../llvm/include/llvm.h"
+#include "../../llvm/include/ir/instructions.h"
 #include "../../llvm/include/llvmContext.h"
+#include "../../frontend/include/visitor.h"
 #include "../../llvm/include/ir/constant.h"
 #include "../include/data.h"
 #include "../include/mipsInst.h"
+#include "../../llvm/include/ir/function.h"
+#include "../../llvm/include/ir/tmp_value.h"
 
 DataPtr Translator::translate(GlobalValuePtr value) {
     auto type = value->global_value_type->get_ele_type();
@@ -59,20 +63,27 @@ void Translator::translate(FunctionPtr function, std::vector<MipsInstPtr> &insts
     //函数开始：申请栈空间，add sp什么的
     new ICode(manager->sp, manager->sp, new MemOffset(false, offset, 0, 1), ICodeOp::subiu, insts);
 
+    //alloc global
+    alloc_global(function, offset);
+
     //函数开始：去拿到参数，即去取映射参数对应的mem或reg
     int i = 0;
     for (auto arg: function->args) {
+        RegPtr rs;
         if (i < A_REG_NUM) {
-            manager->value_reg_map[arg] = manager->areg.at(i);
+            rs = manager->areg.at(i);
         }
         else {
-            manager->value_reg_map[arg] = new MemOffset(false, offset, -i * 4, 4);
+            auto rs_offset = new MemOffset(false, offset, -i * 4, 4);
+            rs = get_l_swap();
+            new MemCode(rs, manager->sp, rs_offset,
+                rs_offset->get_align_size() == 1 ? MemCodeOp::lbu : MemCodeOp::lw, insts);
         }
+        RegPtr rd = alloc_rd(arg, offset);
+        new RCode(rs, rs, rd, RCodeOp::move, insts);
+        reg_to_mem(arg, insts, rd);
         i++;
     }
-
-    //alloc global
-    alloc_global(function, offset);
 
     i = 0;
     for (auto block:function->blocks) {
@@ -115,6 +126,8 @@ void Translator::translate(BasicBlockPtr bb, std::vector<MipsInstPtr> &insts, Dy
             translate(dynamic_cast<InputInstructionPtr>(inst), insts, offset);
         } else if (typeid(*inst) == typeid(OutputInstruction)) {
             translate(dynamic_cast<OutputInstructionPtr>(inst), insts);
+        } else if (typeid(*inst) == typeid(PCInstruction)) {
+            translate(dynamic_cast<PCInstructionPtr>(inst), insts, offset);
         } else {
             throw std::exception();
         }
@@ -154,12 +167,13 @@ RegPtr Translator::mem_to_reg(ValuePtr value, std::vector<MipsInstPtr> &insts,
     //constant and no need to alloc a reg
 }
 
-RegPtr Translator::alloc_rd(InstructionPtr inst, DynamicOffsetPtr offset) {
-    if (manager->value_reg_map.find(inst) == manager->value_reg_map.end()) {
+RegPtr Translator::alloc_rd(ValuePtr inst, DynamicOffsetPtr offset) {
+    auto map = manager->value_reg_map;
+    if (map.find(inst) == map.end()) {
         return alloc_tmp(inst, true, offset);
         //not alloc yet, should alloc tmp
     }
-    if (typeid(*manager->value_reg_map.at(inst)) == typeid(MemOffset)) {
+    if (typeid(*map.at(inst)) == typeid(MemOffset)) {
         return  get_l_swap();
         //in the memory, to the swap reg
     }
@@ -201,12 +215,20 @@ void Translator::release_reg(ValuePtr value, bool add_use) {
         auto tmp = dynamic_cast<TmpRegPtr>(reg);
         if (tmp) {
             if (add_use) {
-                if (inst->add_map_and_try_release()) {
+                if (typeid(*inst) == typeid(TmpValue)) {
+                    tmp->release_occupied();
+                }
+                else if (inst->add_map_and_try_release()) {
                     tmp->release_occupied();
                 }
             }
-            else if (inst->try_release()) {
-                tmp->release_occupied();
+            else {
+                if (typeid(*inst) == typeid(TmpValue)) {
+                    return;
+                }
+                if (inst->try_release()) {
+                    tmp->release_occupied();
+                }
             }
         }
     }

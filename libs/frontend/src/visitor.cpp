@@ -149,8 +149,9 @@ ValuePtr Visitor::visit_l_val_exp(LValExp &node) {
         std::shared_ptr<SymType> type;
         return visit_add_exp(*exp->add_exp, type);
     }
-    return new InputInstruction(current_module->getContext()->getIntType(), current_basic_block,
+    auto input = new InputInstruction(current_module->getContext()->getIntType(), current_basic_block,
         std::holds_alternative<GetCharExp>(node));
+    return input;
 }
 
 void Visitor::visit_func(FuncDef &node) {

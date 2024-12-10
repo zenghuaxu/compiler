@@ -3,18 +3,25 @@
 //
 
 #include "../../include/ir/instructions.h"
+#include "../../include/ir/basicBlock.h"
+#include "../../include/ir/function.h"
 
 Instruction::Instruction(ValueReturnTypePtr return_type, ValueType type, BasicBlockPtr basic_block):
         User(return_type, type) {
-    if (type != ValueType::AllocaInst) {
-        if (type != ValueType::PhiInst) {
-            basic_block->add_inst(this);
-            this->basic_block = basic_block;
-        }
+    if (type == ValueType::tmp) {
+        return;
     }
-    else {
+    if (type == ValueType::AllocaInst) {
         basic_block->get_function()->insert_allocation(this);
         this->basic_block = basic_block->get_function()->get_first_bb();
+    }
+    else if (type == ValueType::PCInst) {
+        basic_block->add_inst_before_last(this);
+        this->basic_block = basic_block;
+    }
+    else if (type != ValueType::PhiInst) {
+        basic_block->add_inst(this);
+        this->basic_block = basic_block;
     }
     return_type->getContext()->SaveValue(this);
 }
@@ -56,11 +63,17 @@ BranchInstruction::BranchInstruction(ValuePtr condition, BasicBlockPtr true_bloc
     BasicBlockPtr current_block):
     Instruction(condition->get_value_return_type()->getContext()->getVoidType(),
         ValueType::BranchInst, current_block) {
-    this->add_use(new Use(this, condition));
-    this->add_use(new Use(this, true_block));
-    this->add_use(new Use(this, false_block));
+    this->add_use(new Use(this, condition)); //0
+    this->add_use(new Use(this, true_block)); //1
+    this->add_use(new Use(this, false_block)); //2
     current_block->insert_goto(true_block);
     current_block->insert_goto(false_block);
+}
+
+void BranchInstruction::substitute(BasicBlockPtr old_block, BasicBlockPtr new_block) {
+    auto num = use_list.at(1)->getValue() == old_block ? 1 : 2;
+    old_block->delete_user(this);
+    this->use_list.at(num) = new Use(this, new_block);
 }
 
 JumpInstruction::JumpInstruction(BasicBlockPtr jump_block, BasicBlockPtr current_block):
@@ -68,6 +81,11 @@ JumpInstruction::JumpInstruction(BasicBlockPtr jump_block, BasicBlockPtr current
         ValueType::JumpInst, current_block) {
     this->add_use(new Use(this, jump_block));
     current_block->insert_goto(jump_block);
+}
+
+void JumpInstruction::substitute(BasicBlockPtr old_bb, BasicBlockPtr new_bb) {
+    this->delete_use(use_list.at(0));
+    this->add_use(new Use(this, new_bb));
 }
 
 AllocaInstruction::AllocaInstruction(ValueReturnTypePtr return_type, BasicBlockPtr basic_block):
@@ -193,11 +211,75 @@ void PhiInstruction::print_full(std::ostream &out) {
 
 void PhiInstruction::add_option(ValuePtr value, BasicBlockPtr basic_block) {
     options[basic_block] = value;
+    use_list.push_back(new Use(this, value));
+    value->add_user(this);
+    //TODO !!! CHECK
 }
 
 //JUST FOR LOAD!!! OTHERS MAY ERR
 void Instruction::substitute_instruction(ValuePtr value) {
     for (auto user:user_list) {
         user->replace_use(this, value);
+        value->add_user(user);
+    }
+}
+
+PCInstruction::PCInstruction(BasicBlockPtr basic_block):
+    Instruction(basic_block->getContext()->getVoidType(), ValueType::PCInst, basic_block) {
+    basic_block->mark_pc(this);
+}
+
+void PCInstruction::add_edge(ValuePtr from, PhiInstructionPtr to) {
+    //maintain use/def
+    auto inst_from = dynamic_cast<InstructionPtr>(from);
+    if (inst_from) {
+        use.insert(inst_from);
+    }
+    auto arg = dynamic_cast<ArgumentPtr>(from);
+    if (arg) {
+        use.insert(arg);
+    }
+    if (use.find(to) == use.end()) {
+        def.insert(to);
+    }
+
+    //maintain graph
+    PCNode * from_node = nullptr, *to_node = nullptr;
+    for (auto node: nodes) {
+        if (*node == from) {
+            from_node = node;
+        } else if (*node == to) {
+            to_node = node;
+        }
+    }
+    if (!from_node) {
+        from_node = new PCNode(from);
+        nodes.push_back(from_node);
+    }
+    if (!to_node) {
+        to_node = new PCNode(to);
+        nodes.push_back(to_node);
+    }
+    from_node->insert_child(to_node);
+    to_node->insert_ancestor(from_node);
+    //TODO CHECK!!!
+    //times cal in PHI 用于临时寄存器
+    //use_list.push_back(new Use(to, from));
+}
+
+PCNode::PCNode(ValuePtr value): value(value) {}
+bool PCNode::operator==(ValuePtr other) {
+    return value == other;
+}
+
+void PCInstruction::print_full(std::ostream &out) {
+    out << "pc: ";
+    for (auto node: nodes) {
+        for (auto edge: node->children) {
+            node->value->print(out);
+            out << "=>";
+            edge->value->print(out);
+            out << " ";
+        }
     }
 }

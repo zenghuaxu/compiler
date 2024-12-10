@@ -42,8 +42,16 @@ class Function:public Value{
     void pad();
     void create_conflict_graph();
 
+    std::set<int> get_active_blocks(Variable var);
+
+    void add_conflict(Variable i, Variable j);
+
     void global_register_map(std::vector<SaveRegPtr> &save_regs, std::unordered_map<ValuePtr, RegPtr> &map,
-        DynamicOffsetPtr offset);
+                             DynamicOffsetPtr offset);
+
+    ValuePtr get_key(Variable var);
+
+    bool var_contains_conflict(Variable var, Variable other);
 
     void emit_blocks();
 
@@ -80,6 +88,7 @@ class Function:public Value{
     BasicBlockPtr get_first_bb() {
         return blocks.at(0);
     }
+    void delete_phi();
 
     private:
     std::vector<ArgumentPtr> args;
@@ -88,7 +97,7 @@ class Function:public Value{
     unsigned int current_object_id;
     std::vector<std::set<BasicBlockPtr>> strict_dom_sets;
 
-    std::vector<InstructionPtr> cross_block_variable;
+    std::vector<Variable> cross_block_variable;
     int saved_reg_used_num = 0;
 };
 

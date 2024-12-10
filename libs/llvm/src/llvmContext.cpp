@@ -37,10 +37,17 @@ void LLVMContext::mem2reg() {
     main_func->rename();
 }
 
-void LLVMContext::mem2reg1() {
+void LLVMContext::emit_bb() {
     for (auto func: functions) {
         func->emit_blocks();
     }
 
     main_func->emit_blocks();
+}
+
+void LLVMContext::delete_phi() {
+    for (auto func: functions) {
+        func->delete_phi();
+    }
+    main_func->delete_phi();
 }

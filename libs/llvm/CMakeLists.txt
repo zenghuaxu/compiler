@@ -18,4 +18,7 @@ add_library(llvm
         src/ir/instructions.cpp
         src/ir/use.cpp
         src/llvmContext.cpp
+        src/ir/value.cpp
+        src/ir/user.cpp
+        include/ir/tmp_value.h
 )

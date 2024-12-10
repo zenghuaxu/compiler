@@ -7,6 +7,11 @@
 #include "../../include/ir/basicBlock.h"
 #include "../../include/ir/constant.h"
 #include "../../../include/configure.h"
+#include "../../include/ir/function.h"
+
+
+template <class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
+template <class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 
 BasicBlock::BasicBlock(ValueReturnTypePtr return_type, FunctionPtr function_ptr):
         User(return_type, ValueType::BasicBlock) {
@@ -84,10 +89,18 @@ void BasicBlock::mark_active(int i) {
 //             std::cout << " func:" << function->get_name() << " block: "  << id << std::endl;
 //         }
 // #endif
-        it->mark_active(i);
+        std::visit(overloaded{
+            [this, i](InstructionPtr &it) { it->mark_active(i); },
+            [this, i](ArgumentPtr &it) { it->mark_active(i); },
+        }
+        ,it);
     }
     for (auto it: def_set) {
-        it->mark_active(i);
+        std::visit(overloaded{
+            [this, i](InstructionPtr &it) { it->mark_active(i); },
+            [this, i](ArgumentPtr &it) { it->mark_active(i); },
+        }
+        ,it);
     }
 }
 
@@ -110,21 +123,59 @@ bool BasicBlock::update_in_set() {
     return in_set.size() != size;
 }
 
-void BasicBlock::fetch_cross(std::vector<InstructionPtr> &cross) {//TODO IS SLOW SHOULD PUT IN FUNCTION
+bool variantCompare(const std::variant<InstructionPtr, ArgumentPtr>& var,
+    const InstructionPtr value) {
+    if (std::holds_alternative<InstructionPtr>(var)) {
+        return std::get<InstructionPtr>(var) == value;
+    }
+    return false;
+}
+
+void BasicBlock::fetch_cross(std::vector<Variable> &cross) {//TODO IS SLOW SHOULD PUT IN FUNCTION
     for (auto it: use_list) {
         auto inst = dynamic_cast<InstructionPtr>(it->getValue());
         if (inst && inst->active_block_seq.size() > 1) {
-            cross.emplace_back(inst);
+            std::set<Variable> vars;
+            if (std::find_if(cross.begin(), cross.end(),
+                [inst](const auto& v) { return variantCompare(v, inst);})
+                == cross.end()) {
+                cross.emplace_back(inst);
+            }
             inst->is_global = true;
         }
+    }
+    for (auto it: phi_instructions) {
+        cross.emplace_back(it.second);
+        it.second->is_global = true;
     }
 }
 
 void BasicBlock::add_to_use_def(InstructionPtr inst) {
+    if (typeid(*inst) == typeid(PCInstruction)) {
+        auto pc = dynamic_cast<PCInstructionPtr>(inst);
+        for (auto use: pc->get_use()) {
+            if (def_set.find(use) == def_set.end()) {
+                use_set.insert(use);
+            }
+        }
+        for (auto def: pc->get_def()) {
+            if (use_set.find(def) == use_set.end()) {
+                def_set.insert(def);
+            }
+        }
+        //DO NOT CAL AGAIN!!!
+        return;
+    }
     for (auto it: inst->use_list) {
         auto instruction_ptr = dynamic_cast<InstructionPtr>(it->getValue());
         if (instruction_ptr/*is a variable*/ && def_set.find(instruction_ptr) == def_set.end()) {
             use_set.insert(instruction_ptr);
+        }
+        else {
+            auto arg = dynamic_cast<ArgumentPtr>(it->getValue());
+            if (arg) {
+                use_set.insert(arg);
+            }
         }
     }
     if (use_set.find(inst) == use_set.end()) {
@@ -231,7 +282,9 @@ void BasicBlock::rename(std::map<AllocaInstructionPtr, std::vector<ValuePtr>> &d
             auto addr = store->use_list.at(1)->getValue();
             if (typeid(*addr) == typeid(AllocaInstruction)) {
                 auto alloca = dynamic_cast<AllocaInstruction*>(addr);
-                current_bb_def[alloca] = store->use_list.at(0)->getValue();
+                auto data = store->use_list.at(0)->getValue();
+                current_bb_def[alloca] = data;
+                data->delete_user(store);
                 it = use_list.erase(it);
             }
             else { it++; }
@@ -278,6 +331,42 @@ void BasicBlock::rename(std::map<AllocaInstructionPtr, std::vector<ValuePtr>> &d
         defs[item.first].pop_back();
         if (defs[item.first].empty()) {
             defs.erase(item.first);
+        }
+    }
+}
+
+void BasicBlock::add_inst_before_last(InstructionPtr inst) {
+    assert(!use_list.empty());
+    use_list.insert(use_list.end() - 1, new Use(this, inst));
+}
+
+void BasicBlock::substitute_goto(BasicBlockPtr old_bb, BasicBlockPtr new_bb) {
+    for (auto & goto_basic_block : goto_basic_blocks) {
+        if (goto_basic_block == old_bb) {
+            goto_basic_block = new_bb;
+        }
+    }
+    auto inst = use_list.back()->getValue();
+    auto jump = dynamic_cast<JumpInstructionPtr>(inst);
+    auto branch = dynamic_cast<BranchInstructionPtr>(inst);
+    if (jump) {
+        jump->substitute(old_bb, new_bb);
+    }
+    if (branch) {
+        branch->substitute(old_bb, new_bb);
+    }
+}
+
+void BasicBlock::delete_phi() {
+    for (auto phi: phi_instructions) {
+        auto inst = phi.second;
+        auto map = inst->get_options();
+        for (auto option: map) {
+            auto pc = option.first->get_pc();
+            if (!pc) {
+                pc = new PCInstruction(option.first);
+            }
+            pc->add_edge(option.second, inst);
         }
     }
 }
