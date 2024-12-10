@@ -315,8 +315,10 @@ void Translator::translate(GetElementPtrInstructionPtr getelement, std::vector<M
             new ICode(rs, rd, imm * 4, ICodeOp::addiu, insts);
         }
         else {
-            new ICode(rt, rd, 4, ICodeOp::mul, insts);
-            new RCode(rs, rd, rd, RCodeOp::addu, insts);
+            //THIS PLACE ERROR, WHY???
+            //ALWAYS PUT ON SWAP2
+            new ICode(rt, manager->swap.at(1), 4, ICodeOp::mul, insts);
+            new RCode(rs, manager->swap.at(1), rd, RCodeOp::addu, insts);
         }
     }
     //i8

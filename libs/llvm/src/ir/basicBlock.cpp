@@ -83,24 +83,21 @@ bool BasicBlock::enable_pad() {
 
 void BasicBlock::mark_active(int i) {
     for (auto it: in_set) {
-// #ifdef MIPS_DEBUG
-//         for (auto it: in_set) {
-//             it->print_full(std::cout);
-//             std::cout << " func:" << function->get_name() << " block: "  << id << std::endl;
-//         }
-// #endif
-        std::visit(overloaded{
-            [this, i](InstructionPtr &it) { it->mark_active(i); },
-            [this, i](ArgumentPtr &it) { it->mark_active(i); },
-        }
-        ,it);
+        // #ifdef MIPS_DEBUG
+        //         for (auto it: in_set) {
+        //             it->print_full(std::cout);
+        //             std::cout << " func:" << function->get_name() << " block: "  << id << std::endl;
+        //         }
+        // #endif
+        it->mark_active(i);
     }
     for (auto it: def_set) {
-        std::visit(overloaded{
-            [this, i](InstructionPtr &it) { it->mark_active(i); },
-            [this, i](ArgumentPtr &it) { it->mark_active(i); },
-        }
-        ,it);
+        it->mark_active(i);
+    }
+}
+void BasicBlock::create_use_def() {
+    for (auto it: use_list) {
+        add_to_use_def(dynamic_cast<InstructionPtr>(it->getValue()));
     }
 }
 
@@ -131,61 +128,25 @@ bool variantCompare(const std::variant<InstructionPtr, ArgumentPtr>& var,
     return false;
 }
 
-void BasicBlock::fetch_cross(std::vector<Variable> &cross) {//TODO IS SLOW SHOULD PUT IN FUNCTION
+void BasicBlock::fetch_cross(std::vector<InstructionPtr> &cross) {//TODO IS SLOW SHOULD PUT IN FUNCTION
     for (auto it: use_list) {
         auto inst = dynamic_cast<InstructionPtr>(it->getValue());
         if (inst && inst->active_block_seq.size() > 1) {
-            std::set<Variable> vars;
-            if (std::find_if(cross.begin(), cross.end(),
-                [inst](const auto& v) { return variantCompare(v, inst);})
-                == cross.end()) {
-                cross.emplace_back(inst);
-            }
+            cross.emplace_back(inst);
             inst->is_global = true;
         }
-    }
-    for (auto it: phi_instructions) {
-        cross.emplace_back(it.second);
-        it.second->is_global = true;
     }
 }
 
 void BasicBlock::add_to_use_def(InstructionPtr inst) {
-    if (typeid(*inst) == typeid(PCInstruction)) {
-        auto pc = dynamic_cast<PCInstructionPtr>(inst);
-        for (auto use: pc->get_use()) {
-            if (def_set.find(use) == def_set.end()) {
-                use_set.insert(use);
-            }
-        }
-        for (auto def: pc->get_def()) {
-            if (use_set.find(def) == use_set.end()) {
-                def_set.insert(def);
-            }
-        }
-        //DO NOT CAL AGAIN!!!
-        return;
-    }
     for (auto it: inst->use_list) {
         auto instruction_ptr = dynamic_cast<InstructionPtr>(it->getValue());
         if (instruction_ptr/*is a variable*/ && def_set.find(instruction_ptr) == def_set.end()) {
             use_set.insert(instruction_ptr);
         }
-        else {
-            auto arg = dynamic_cast<ArgumentPtr>(it->getValue());
-            if (arg) {
-                use_set.insert(arg);
-            }
-        }
     }
     if (use_set.find(inst) == use_set.end()) {
         def_set.insert(inst);
-    }
-}
-
-void BasicBlock::create_use_def() {
-    for (auto it: use_list) {
-        add_to_use_def(dynamic_cast<InstructionPtr>(it->getValue()));
     }
 }
 
