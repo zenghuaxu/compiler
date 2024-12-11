@@ -65,9 +65,9 @@ int main() {
     }
     err.close();
 
-    // module->emit_bb();
-    // module->mem2reg();
-    // module->delete_phi();
+    module->emit_bb();
+    module->mem2reg();
+    module->delete_phi();
     #ifdef LLVM_IR
     OUTPUT_OPEN(output, llvm_ir.txt);
     module->print(output);

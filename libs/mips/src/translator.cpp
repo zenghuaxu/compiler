@@ -63,20 +63,27 @@ void Translator::translate(FunctionPtr function, std::vector<MipsInstPtr> &insts
     //函数开始：申请栈空间，add sp什么的
     new ICode(manager->sp, manager->sp, new MemOffset(false, offset, 0, 1), ICodeOp::subiu, insts);
 
+    //alloc global
+    alloc_global(function, offset);
+
     //函数开始：去拿到参数，即去取映射参数对应的mem或reg
     int i = 0;
     for (auto arg: function->args) {
+        RegPtr rs;
         if (i < A_REG_NUM) {
-            manager->value_reg_map[arg] = manager->areg.at(i);
+            rs = manager->areg.at(i);
         }
         else {
-            manager->value_reg_map[arg] = new MemOffset(false, offset, -i * 4, 4);
+            auto rs_offset = new MemOffset(false, offset, -i * 4, 4);
+            rs = get_l_swap();
+            new MemCode(rs, manager->sp, rs_offset,
+                rs_offset->get_align_size() == 1 ? MemCodeOp::lbu : MemCodeOp::lw, insts);
         }
+        RegPtr rd = alloc_rd(arg, offset);
+        new RCode(rs, rs, rd, RCodeOp::move, insts);
+        reg_to_mem(arg, insts, rd);
         i++;
     }
-
-    //alloc global
-    alloc_global(function, offset);
 
     i = 0;
     for (auto block:function->blocks) {

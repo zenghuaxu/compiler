@@ -77,7 +77,7 @@ class BasicBlock: public User{
 
     void mark_active(int i);
     bool update_in_set();
-    void fetch_cross(std::vector<InstructionPtr> &cross);
+    void fetch_cross(std::vector<Variable> &cross);
     void create_use_def();
 
     bool empty_father();
@@ -113,10 +113,10 @@ private:
     std::map<AllocaInstructionPtr, PhiInstructionPtr> phi_instructions;
 
     //寄存器分配：
-    std::set<InstructionPtr> use_set;
-    std::set<InstructionPtr> def_set;
-    std::set<InstructionPtr> in_set;
-    std::set<InstructionPtr> out_set;
+    std::set<Variable> use_set;
+    std::set<Variable> def_set;
+    std::set<Variable> in_set;
+    std::set<Variable> out_set;
 
     //支配集计算：
     BasicBlockPtr idom = nullptr;

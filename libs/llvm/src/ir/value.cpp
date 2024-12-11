@@ -6,6 +6,7 @@
 # include "../../include/ir/user.h"
 
 void Value::delete_user(UserPtr user)  {
+    //TODO CHECK HAVE TO ONLY DELETE ONE
     auto it = std::find(user_list.begin(), user_list.end(), user);
     user_list.erase(it);
 }

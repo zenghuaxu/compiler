@@ -23,11 +23,13 @@ class User: public Value {
 
     void delete_use(UsePtr use);
     //TODO CHECK
+    //REMOVE THE BREAK
     void replace_use(ValuePtr old_value, ValuePtr new_value) {
         for (auto & i : use_list) {
             if (i->getValue() == old_value) {
                 i = new Use(this, new_value);
-                break;
+                new_value->add_user(this);
+                //break;
             }
         }
     }

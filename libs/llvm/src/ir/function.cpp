@@ -61,7 +61,6 @@ void Function::pad() {//TODO INEFFICIENT
     }
 }
 
-
 void Function::create_conflict_graph() {
     //活跃变量分析
     for (auto & block : blocks) {
@@ -85,29 +84,45 @@ void Function::create_conflict_graph() {
     for (auto block:blocks) {
         block->fetch_cross(cross_block_variable);
     }
+    for (auto arg: args) {
+        if (!arg->get_active_block_seq().empty()) {
+            cross_block_variable.emplace_back(arg);
+        }
+    }
 
     #ifdef MIPS_DEBUG
     for (auto it: cross_block_variable) {
         std::cout << "cross_active in func:" << name << ": ";
-        it->print_full(std::cout);
+        std::visit(overloaded{
+            [this](InstructionPtr &inst) {inst->print(std::cout);},
+            [this](ArgumentPtr &arg) {arg->print(std::cout);},
+        }, it);
         std::cout << std::endl;
     }
     #endif
     i = 0;
     for (; i < cross_block_variable.size(); i++) {
         for (int j = i + 1; j < cross_block_variable.size(); j++) {
-            auto front = cross_block_variable.at(i)->get_active_block_seq();
-            auto back = cross_block_variable.at(j)->get_active_block_seq();
+            auto i_object = cross_block_variable.at(i);
+            auto j_object = cross_block_variable.at(j);
+            auto front = get_active_blocks(i_object);
+            auto back  = get_active_blocks(j_object);
             std::set<int> inter;
             std::set_intersection(front.begin(), front.end(), back.begin(), back.end(),
                 std::inserter(inter, inter.end()));
             if (!inter.empty()) {
-                cross_block_variable.at(i)->add_conflict(cross_block_variable.at(j));
-                cross_block_variable.at(j)->add_conflict(cross_block_variable.at(i));
+                add_conflict(i_object, j_object);
+                add_conflict(j_object, i_object);
                 #ifdef MIPS_DEBUG
-                cross_block_variable.at(i)->print(std::cout);
+                std::visit(overloaded{
+                    [this](InstructionPtr &inst) {inst->print(std::cout);},
+                        [this](ArgumentPtr &arg) {arg->print(std::cout);},
+                }, i_object);
                 std::cout << " ";
-                cross_block_variable.at(j)->print(std::cout);
+                std::visit(overloaded{
+                    [this](InstructionPtr &inst) {inst->print(std::cout);},
+                        [this](ArgumentPtr &arg) {arg->print(std::cout);},
+                }, j_object);
                 std::cout << std::endl;
                 #endif
             }
@@ -115,13 +130,27 @@ void Function::create_conflict_graph() {
     }
 }
 
+std::set<int> Function::get_active_blocks(Variable var) {
+    return std::visit(overloaded{
+    [this](InstructionPtr &inst) { return inst->get_active_block_seq();},
+    [this](ArgumentPtr &arg) { return arg->get_active_block_seq();},}
+    ,var);
+}
+
+void Function::add_conflict(Variable i, Variable j) {
+    std::visit(overloaded{
+        [this, j](InstructionPtr &inst) {inst->add_conflict(j);},
+            [this, j](ArgumentPtr &arg) {arg->add_conflict(j);},
+    }, i);
+}
+
 //图着色
 void Function::global_register_map(std::vector<SaveRegPtr> &save_regs,
     std::unordered_map<ValuePtr, RegPtr> &map, DynamicOffsetPtr offset) {
-    std::vector<InstructionPtr> pop_values;
-    std::set<InstructionPtr> un_map;
-    std::set<InstructionPtr> mapped;
-    std::unordered_map<InstructionPtr, int> conflict_egdes;
+    std::vector<Variable> pop_values;
+    std::set<Variable> un_map;
+    std::set<Variable> mapped;
+    std::unordered_map<Variable, int> conflict_egdes;
 
     if (cross_block_variable.empty()) {
         return;
@@ -129,7 +158,10 @@ void Function::global_register_map(std::vector<SaveRegPtr> &save_regs,
 
     //init
     for (auto it: cross_block_variable) {
-        conflict_egdes[it] = it->get_conflict_count();
+        conflict_egdes[it] = std::visit(overloaded{
+            [this](InstructionPtr &inst) { return inst->get_conflict_count();},
+                [this](ArgumentPtr &arg) { return arg->get_conflict_count();}
+        },it);
     }
 
     //pop
@@ -141,7 +173,7 @@ void Function::global_register_map(std::vector<SaveRegPtr> &save_regs,
                 pop_values.push_back(it.first);
                 conflict_egdes.erase(it.first);
                 for (auto rest: conflict_egdes) {
-                    if (rest.first->contains_conflict(it.first)) {
+                    if (var_contains_conflict(rest.first, it.first)) {
                         conflict_egdes.at(rest.first)--;
                     }
                 }
@@ -155,31 +187,31 @@ void Function::global_register_map(std::vector<SaveRegPtr> &save_regs,
             un_map.insert(conflict_egdes.begin()->first);
             conflict_egdes.erase(conflict_egdes.begin());
             for (auto rest: conflict_egdes) {
-                if (rest.first->contains_conflict(it->first)) {
+                if (var_contains_conflict(rest.first, it->first)) {
                     conflict_egdes.at(rest.first)--;
                 }
             }
         }
     }
 
-    map[conflict_egdes.begin()->first] = save_regs.at(0);
+    map[get_key(conflict_egdes.begin()->first)] = save_regs.at(0);
     mapped.insert(conflict_egdes.begin()->first);
     int max = 1;
     //push
-    while (pop_values.size() > 0) {
+    while (!pop_values.empty()) {
         auto node = pop_values.at(pop_values.size() - 1);
         pop_values.pop_back();
 
         std::set<int> colors = {};
         for(auto it: mapped) {
-            if (node->contains_conflict(it)) {
-                colors.insert(map.at(it)->get_id());
+            if (var_contains_conflict(node, it)) {
+                colors.insert(map.at(get_key(it))->get_id());
             }
         }
 
         for (int i = 0; i < SAVE_NUM; i++) { //*
             if (colors.find(i) == colors.end()) {
-                map[node] = save_regs.at(i);
+                map[get_key(node)] = save_regs.at(i);
                 mapped.insert(node);
                 max = std::max(max, i + 1);
                 break;
@@ -192,14 +224,14 @@ void Function::global_register_map(std::vector<SaveRegPtr> &save_regs,
     //TODO CHECK ALLOC
     for (auto it: un_map) {
         MemOffsetPtr mem_offset;
-        if (it->get_value_return_type()->get_ele_type() ==
-            it->get_value_return_type()->getContext()->getCharType()) {
-            mem_offset = new MemOffset(offset, it->get_value_return_type()->get_byte_size(), 1);
+        if (get_key(it)->get_value_return_type()->get_ele_type() ==
+            get_key(it)->get_value_return_type()->getContext()->getCharType()) {
+            mem_offset = new MemOffset(offset, get_key(it)->get_value_return_type()->get_byte_size(), 1);
         }
         else {
-            mem_offset = new MemOffset(offset, it->get_value_return_type()->get_byte_size(), 4);
+            mem_offset = new MemOffset(offset, get_key(it)->get_value_return_type()->get_byte_size(), 4);
         }
-        map[it] = mem_offset;
+        map[get_key(it)] = mem_offset;
     }
 
 #ifdef MIPS_DEBUG
@@ -209,6 +241,20 @@ void Function::global_register_map(std::vector<SaveRegPtr> &save_regs,
         std::cout << " in func " << name <<" map to save" << it.second->get_id() << std::endl;
     }
 #endif
+}
+
+ValuePtr Function::get_key(Variable var) {
+    return std::visit(overloaded{
+    [this](InstructionPtr &inst) {return dynamic_cast<ValuePtr>(inst);},
+        [this](ArgumentPtr &arg) {
+            return dynamic_cast<ValuePtr>(arg);},} ,var);
+}
+
+bool Function::var_contains_conflict(Variable var, Variable other) {
+    return std::visit(overloaded{
+    [this, other](InstructionPtr &inst) { return inst->contains_conflict(other);},
+        [this, other](ArgumentPtr &arg) { return arg->contains_conflict(other);}},
+            var);
 }
 
 void Function::emit_blocks() {

@@ -92,8 +92,8 @@ void Translator::translate(BinaryInstructionPtr bi, std::vector<MipsInstPtr> &in
             new ICode(rs, rd, imm, bi->getBinaryOp(), insts);
         }
         else {
-            new ICode(nullptr, rd, imm, ICodeOp::li, insts);
-            new RCode(rs, rd, rd, bi->getBinaryOp(), insts);
+            new ICode(nullptr, get_r_swap(), imm, ICodeOp::li, insts);
+            new RCode(rs, get_r_swap(), rd, bi->getBinaryOp(), insts);
         }
     }
     else {
@@ -195,7 +195,13 @@ void Translator::translate(ZextInstructionPtr zext, std::vector<MipsInstPtr> &in
         release_reg(zext, false);
     }
     else {
-        manager->value_reg_map[zext] = manager->value_reg_map.at(zext->use_list.at(0)->getValue());
+        //origin
+        //manager->value_reg_map[zext] = manager->value_reg_map.at(zext->use_list.at(0)->getValue());
+        auto rd = alloc_rd(zext, offset);
+        auto rs = mem_to_reg(zext->use_list.at(0)->getValue(), insts, true, true);
+        new RCode(rs, rs, rd, RCodeOp::move, insts);
+        release_reg(zext->use_list.at(0)->getValue(), false);
+        reg_to_mem(zext, insts, rd);
     }
     //TODO CHECK MEM ACCESS!!
 }

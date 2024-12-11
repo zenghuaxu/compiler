@@ -66,6 +66,7 @@ class Value {
 
     public:
     void add_user(UserPtr user) {
+        //TODO CHECK MAY MORE THAN USERS, but have to be more(according to tmp reg alloc)
         user_list.emplace_back(user);
     }
     void delete_user(UserPtr user);

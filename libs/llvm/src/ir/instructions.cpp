@@ -219,8 +219,8 @@ void PhiInstruction::add_option(ValuePtr value, BasicBlockPtr basic_block) {
 //JUST FOR LOAD!!! OTHERS MAY ERR
 void Instruction::substitute_instruction(ValuePtr value) {
     for (auto user:user_list) {
+        //TODO ADD USE INTER THE FOLLOW FUNCTION
         user->replace_use(this, value);
-        value->add_user(user);
     }
 }
 

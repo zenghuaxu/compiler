@@ -97,7 +97,7 @@ class Function:public Value{
     unsigned int current_object_id;
     std::vector<std::set<BasicBlockPtr>> strict_dom_sets;
 
-    std::vector<InstructionPtr> cross_block_variable;
+    std::vector<Variable> cross_block_variable;
     int saved_reg_used_num = 0;
 };
 
