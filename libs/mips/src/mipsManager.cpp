@@ -24,6 +24,9 @@ MipsManager::MipsManager(ModulePtr module):
     for (int i = 0; i < V_REG_NUM; i++) {
         vreg.emplace_back(new VReg(i));
     }
+    for (int i = 0; i < K_REG_NUM; i++) {
+        kreg.emplace_back(new KReg(i));
+    }
     sp = new SpReg();
     zero = new ZeroReg();
     ra = new RaReg();

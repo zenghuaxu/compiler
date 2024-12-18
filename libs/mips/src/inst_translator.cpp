@@ -13,6 +13,7 @@
 #include "../../llvm/include/ir/function.h"
 #include "../../llvm/include/ir/tmp_value.h"
 #include "../include/mipsInst.h"
+#include "../opt/divOpt.cpp"
 
 void Translator::translate(AllocaInstructionPtr alloca_instruction, std::vector<MipsInstPtr> &insts,
     DynamicOffsetPtr offset) {
@@ -88,12 +89,25 @@ void Translator::translate(BinaryInstructionPtr bi, std::vector<MipsInstPtr> &in
     }
     else if (!rt) {
         auto imm = dynamic_cast<ConstantPtr>(right)->get_value();
-        if (bi->op != BinaryOp::MOD) {
-            new ICode(rs, rd, imm, bi->getBinaryOp(), insts);
+        if (bi->op == BinaryOp::DIV) {
+            Opt::generate_div(rs, rd, imm, insts, get_l_swap(), get_r_swap(), manager->zero);
+        }
+        else if (bi->op == BinaryOp::MOD) {
+            if (rs == get_l_swap()) {
+                new RCode(rs, rs, manager->kreg.at(0), RCodeOp::move, insts);
+            }
+            Opt::generate_div(rs, manager->kreg.at(1), imm, insts, get_l_swap(), get_r_swap(), manager->zero);
+            if (rs == get_l_swap()) {
+                new RCode(manager->kreg.at(0), manager->kreg.at(0), rs, RCodeOp::move, insts);
+            }
+            new ICode(manager->kreg.at(1), manager->kreg.at(0), imm, ICodeOp::mul, insts);
+            new RCode(rs, manager->kreg.at(0), rd, RCodeOp::subu, insts);
+            //original
+            // new ICode(nullptr, get_r_swap(), imm, ICodeOp::li, insts);
+            // new RCode(rs, get_r_swap(), rd, bi->getBinaryOp(), insts);
         }
         else {
-            new ICode(nullptr, get_r_swap(), imm, ICodeOp::li, insts);
-            new RCode(rs, get_r_swap(), rd, bi->getBinaryOp(), insts);
+            new ICode(rs, rd, imm, bi->getBinaryOp(), insts);
         }
     }
     else {

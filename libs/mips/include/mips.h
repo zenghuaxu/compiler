@@ -41,6 +41,8 @@ class AReg;
 using ARegPtr = AReg*;
 class VReg;
 using VRegPtr = VReg*;
+class KReg;
+using KRegPtr = KReg*;
 
 class RCode;
 using RCodePtr = RCode*;
@@ -52,5 +54,6 @@ using ICodePtr = ICode*;
 #define SWAP_NUM 2
 #define A_REG_NUM 4
 #define V_REG_NUM 2
+#define K_REG_NUM 2
 
 #endif //MIPS_H

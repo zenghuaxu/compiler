@@ -161,4 +161,15 @@ class VReg: public Reg {
     int id;
 };
 
+class KReg: public Reg {
+public:
+    KReg(int id): id(id) {}
+    int get_id() override {return id;}
+    void print(std::ostream &out) override {
+        out << "$k" <<id;
+    }
+    private:
+    int id;
+};
+
 #endif //MIPSREG_H

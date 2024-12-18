@@ -24,6 +24,8 @@ class Tag: public MipsInst {
     public:
     Tag(std::vector<MipsInstPtr> &insts, std::string tag): MipsInst(insts), name(std::move(tag)) {}
     void print(std::ostream &out) override;
+    std::string getName() { return name; }
+
     private:
     std::string name;
 };
@@ -86,6 +88,8 @@ enum class ICodeOp {
     mul,
     div,
     andi,
+    sra,
+    sll,
 
     li,
 };
@@ -110,6 +114,7 @@ public:
         rs(rs), rt(rt), immediate(0), offset(offset), op(op) {}
 
     void print(std::ostream &out) override;
+    void reduce_mul();
 
     private:
     RegPtr rs;
@@ -164,6 +169,7 @@ class JumpCode: public MipsInst {
         MipsInst(insts), label_name(std::move(name)) {}
 
     void print(std::ostream &out) override;
+    std::string getLabelName() { return label_name; }
 
     private:
     std::string label_name;
@@ -205,6 +211,15 @@ public:
     void print(std::ostream &out) override;
     private:
     std::string label_name;
+    RegPtr rd;
+};
+
+class Mfhi: public MipsInst {
+public:
+    Mfhi(RegPtr rd, std::vector<MipsInstPtr> &insts):
+        MipsInst(insts), rd(rd) {}
+    void print(std::ostream &out) override;
+public:
     RegPtr rd;
 };
 

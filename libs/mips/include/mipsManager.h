@@ -20,6 +20,8 @@ class MipsManager {
     void mem_alloc(ValuePtr value, MemOffsetPtr mem);
 
     void translate();
+    void reduce_mul();
+    void reduce_jump();
 
     void print(std::ostream &out) {
         out << ".data:" << std::endl;
@@ -53,6 +55,7 @@ class MipsManager {
     std::vector<TmpRegPtr> tmp;
     std::vector<SaveRegPtr> save;
     std::vector<SwapRegPtr> swap;
+    std::vector<KRegPtr> kreg;
 
     std::unordered_map<ValuePtr, RegPtr> value_reg_map;
     TranslatorPtr translator;

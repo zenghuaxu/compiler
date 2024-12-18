@@ -53,6 +53,8 @@ std::unordered_map<ICodeOp, std::string> ICodeOpMap = {
     {ICodeOp::subiu, "subiu"},
     {ICodeOp::andi, "andi"},
     {ICodeOp::mul, "mul"},
+    {ICodeOp::sra, "sra"},
+    {ICodeOp::sll, "sll"},
     {ICodeOp::div, "div"},
 };
 
@@ -136,4 +138,9 @@ void LaCode::print(std::ostream &out) {
     out << "\t" << "la ";
     rd->print(out);
     out << " " << label_name;
+}
+
+void Mfhi::print(std::ostream &out) {
+    out << "\t" <<"mfhi ";
+    rd->print(out);
 }

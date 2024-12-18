@@ -9,4 +9,7 @@ add_library(mips
         src/mipsManager.cpp
         src/translator.cpp
         src/inst_translator.cpp
+        opt/divOpt.cpp
+        include/opt.h
+        opt/local.cpp
 )
