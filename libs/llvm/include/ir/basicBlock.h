@@ -24,7 +24,6 @@ class BasicBlock: public User{
     void print_full(std::ostream &out);
 
     void pad();
-
     bool enable_pad();
 
     void add_inst(InstructionPtr inst) {
@@ -61,13 +60,13 @@ class BasicBlock: public User{
         return use_list.empty();
     }
 
-    void merge(BasicBlockPtr basic_block) {
-        for (auto father: father_basic_blocks) {
-            father->delete_goto(this);
-            father->insert_goto(basic_block);
-        }
-        delete this;
-    }
+    // void merge(BasicBlockPtr basic_block) {
+    //     for (auto father: father_basic_blocks) {
+    //         father->delete_goto(this);
+    //         father->insert_goto(basic_block);
+    //     }
+    //     delete this;
+    // }
 
     std::vector<BasicBlockPtr> get_goto() {
         return goto_basic_blocks;
