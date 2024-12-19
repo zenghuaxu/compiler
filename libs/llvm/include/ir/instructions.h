@@ -48,6 +48,8 @@ class Instruction: public User {
     }
     void substitute_instruction(ValuePtr value);
 
+    void substitute_instruction_for_lvn(ValuePtr value);
+
     void delete_myself();
 
 private:
@@ -66,6 +68,9 @@ private:
     bool add_map_and_try_release() {
         if (is_global) return false;
         map_times++;
+        if (user_list.size() <= map_times) {
+            int a = 1;
+        }
         assert(user_list.size() > map_times);
         if (user_list.size() == map_times + 1) {
             return true;
@@ -97,6 +102,7 @@ inline std::unordered_map<TokenType, UnaryOpType> tokentype_to_unary_op = {
 
 class UnaryOpInstruction: public Instruction {
     friend class Translator;
+    friend class BasicBlock;
 
     public:
     UnaryOpInstruction(ValueReturnTypePtr return_type, TokenType op, ValuePtr value, BasicBlockPtr basic_block);
@@ -141,6 +147,7 @@ inline std::unordered_map<BinaryOp, std::string> binary_op_to_string = {
 
 class BinaryInstruction: public Instruction {
     friend class Translator;
+    friend class BasicBlock;
 
     public:
     BinaryInstruction(ValueReturnTypePtr return_type, TokenType op, ValuePtr lhs, ValuePtr rhs,
@@ -191,6 +198,7 @@ inline std::unordered_map<CompOp, std::string> comp_op_to_string = {
 
 class CompareInstruction: public Instruction {
     friend class Translator;
+    friend class BasicBlock;
 
     public:
     CompareInstruction(ValueReturnTypePtr return_type, TokenType op, ValuePtr lhs, ValuePtr rhs,
@@ -267,6 +275,7 @@ public:
 
 class ZextInstruction: public Instruction {
     friend class Translator;
+    friend class BasicBlock;
 
     public:
     ZextInstruction(ValuePtr value, BasicBlockPtr basic_block);
@@ -285,6 +294,7 @@ class ZextInstruction: public Instruction {
 
 class TruncInstruction: public Instruction {
     friend class Translator;
+    friend class BasicBlock;
 
     public:
 
@@ -306,12 +316,12 @@ class CallInstruction: public Instruction {
     friend class Translator;
 
     public:
-    CallInstruction(ValueReturnTypePtr return_type, FunctionPtr function, BasicBlockPtr basic_block):
-        Instruction(return_type, ValueType::CallInst, basic_block), function(function) {}
 
     void insert_parameter(ValuePtr new_value) {
         this->add_use(new Use(this, new_value));
     }
+
+    CallInstruction(ValueReturnTypePtr return_type, FunctionPtr function, BasicBlockPtr basic_block);
 
     void print_full(std::ostream &out);
 
@@ -374,6 +384,7 @@ class StoreInstruction: public Instruction {
 
 class GetElementPtrInstruction: public Instruction {
     friend class Translator;
+    friend class BasicBlock;
 
     public:
     GetElementPtrInstruction(ValuePtr base, ValuePtr offset, BasicBlockPtr basic_block);
@@ -407,8 +418,7 @@ class InputInstruction: public Instruction {
     friend class Translator;
 
     public:
-    explicit InputInstruction(ValueReturnTypePtr return_type, BasicBlockPtr basic_block, bool ch_type):
-        Instruction(return_type, ValueType::InputInst, basic_block), ch_type(ch_type) {}
+    InputInstruction(ValueReturnTypePtr return_type, BasicBlockPtr basic_block, bool ch_type);
 
     void print_full(std::ostream &out) override {
         print(out);
@@ -464,6 +474,7 @@ class PhiInstruction: public Instruction {
     std::map<BasicBlockPtr, ValuePtr> get_options() { return options; }
     void add_option(ValuePtr value, BasicBlockPtr basic_block);
     void print_full(std::ostream &out) override;
+    void replace_use(ValuePtr old, ValuePtr new_value);
 
 private:
     AllocaInstructionPtr alloca;

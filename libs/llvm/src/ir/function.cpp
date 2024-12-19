@@ -410,3 +410,37 @@ void Function::delete_phi() {
         block->delete_phi();
     }
 }
+
+void Function::mark_active_for_dce() {
+    for (auto block:blocks) {
+        for (auto use : block->get_use_list()) {
+            auto inst = dynamic_cast<InstructionPtr>(use->getValue());
+            if (inst) {
+                if (typeid(*inst) == typeid(StoreInstruction) ||
+                    typeid(*inst) == typeid(BranchInstruction) ||
+                    typeid(*inst) == typeid(JumpInstruction) ||
+                    typeid(*inst) == typeid(CallInstruction) ||
+                    typeid(*inst) == typeid(ReturnInstruction) ||
+                    typeid(*inst) == typeid(InputInstruction) ||
+                    typeid(*inst) == typeid(OutputInstruction)) {
+                    put_useful(inst);
+                }
+            }
+        }
+    }
+    for (auto inst:useful) {
+        inst->mark_active_for_dce();
+    }
+}
+
+void Function::dce() {
+    for (auto block:blocks) {
+        block->dce();
+    }
+}
+
+void Function::lvn() {
+    for (auto block:blocks) {
+        block->LVN();
+    }
+}

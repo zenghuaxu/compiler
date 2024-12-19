@@ -5,6 +5,7 @@
 
 #include "../include/visitor.h"
 
+#include "../../llvm/include/ir/instructions.h"
 #include "../../llvm/include/ir/module.h"
 #include "../../llvm/include/ir/constant.h"
 #include "../../llvm/include/ir/function.h"

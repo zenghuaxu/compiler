@@ -51,3 +51,19 @@ void LLVMContext::delete_phi() {
     }
     main_func->delete_phi();
 }
+
+void LLVMContext::dce() {
+    for (auto func: functions) {
+        func->mark_active_for_dce();
+        func->dce();
+    }
+    main_func->mark_active_for_dce();
+    main_func->dce();
+}
+
+void LLVMContext::lvn() {
+    for (auto func: functions) {
+        func->lvn();
+    }
+    main_func->lvn();
+}

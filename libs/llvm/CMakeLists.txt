@@ -21,4 +21,6 @@ add_library(llvm
         src/ir/value.cpp
         src/ir/user.cpp
         include/ir/tmp_value.h
+        opt/lvn.cpp
+        include/opt.h
 )

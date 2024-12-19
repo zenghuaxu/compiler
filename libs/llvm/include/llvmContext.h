@@ -73,6 +73,10 @@ class LLVMContext {
 
     void delete_phi();
 
+    void dce();
+
+    void lvn();
+
 private:
     std::vector<ValuePtr> values;
     std::vector<UsePtr> uses;

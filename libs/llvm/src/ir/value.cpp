@@ -10,3 +10,11 @@ void Value::delete_user(UserPtr user)  {
     auto it = std::find(user_list.begin(), user_list.end(), user);
     user_list.erase(it);
 }
+
+void Value::mark_active_for_dce() {
+    active = true;
+}
+
+bool Value::get_active() {
+    return active;
+}

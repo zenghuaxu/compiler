@@ -62,7 +62,7 @@ class Value {
     protected:
     //for translator, to see if end
     std::vector<UserPtr> user_list;
-
+    bool active = false;
 
     public:
     void add_user(UserPtr user) {
@@ -70,6 +70,10 @@ class Value {
         user_list.emplace_back(user);
     }
     void delete_user(UserPtr user);
+
+    void mark_active_for_dce();
+
+    bool get_active();
 
 
     std::vector<UserPtr> get_user_list() { return user_list;}

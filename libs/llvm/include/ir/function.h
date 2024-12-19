@@ -90,12 +90,22 @@ class Function:public Value{
     }
     void delete_phi();
 
-    private:
+    void put_useful(InstructionPtr instruction) {
+        useful.insert(instruction);
+    }
+    void mark_active_for_dce();
+
+    void dce();
+
+    void lvn();
+
+private:
     std::vector<ArgumentPtr> args;
     std::vector<BasicBlockPtr> blocks;
     std::string name;
     unsigned int current_object_id;
     std::vector<std::set<BasicBlockPtr>> strict_dom_sets;
+    std::set<InstructionPtr> useful;
 
     std::vector<Variable> cross_block_variable;
     int saved_reg_used_num = 0;

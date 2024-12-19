@@ -6,8 +6,8 @@
 
 #include "../../include/ir/basicBlock.h"
 #include "../../include/ir/constant.h"
-#include "../../../include/configure.h"
 #include "../../include/ir/function.h"
+#include "../../include/opt.h"
 
 
 template <class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
@@ -368,5 +368,124 @@ void BasicBlock::delete_phi() {
             }
             pc->add_edge(option.second, inst);
         }
+    }
+}
+
+void BasicBlock::dce() {
+    for (auto it = use_list.begin(); it != use_list.end(); ) {
+        auto inst = dynamic_cast<InstructionPtr>((*it)->getValue());
+        if (!inst->get_active()) {
+            it = use_list.erase(it);
+            continue;
+        }
+        it++;
+    }
+    for (auto it = phi_instructions.begin(); it != phi_instructions.end(); ) {
+        if (!(*it).second->get_active()) {
+            it = phi_instructions.erase(it);
+            continue;
+        }
+        it++;
+    }
+}
+
+void BasicBlock::LVN() {
+    std::unordered_map<struct tripleIR, InstructionPtr> records;
+    for (auto it:use_list) {
+        auto un = dynamic_cast<UnaryOpInstructionPtr>(it->getValue());
+        auto bi = dynamic_cast<BinaryInstructionPtr>(it->getValue());
+        auto comp = dynamic_cast<CompareInstructionPtr>(it->getValue());
+        auto zext = dynamic_cast<ZextInstructionPtr>(it->getValue());
+        auto trunc = dynamic_cast<TruncInstructionPtr>(it->getValue());
+        auto getele = dynamic_cast<GetElementPtrInstructionPtr>(it->getValue());
+        ValuePtr lhs = nullptr, rhs = nullptr;
+        int op = -1;
+        ValueReturnTypePtr type = nullptr;
+        InstructionPtr inst = nullptr;
+        if (un) {
+            lhs = un->use_list.at(0)->getValue();
+            op = (int)unary_op_map[un->op];
+            type = un->get_value_return_type();
+            inst = un;
+        }
+        else if (bi) {
+            lhs = bi->use_list.at(0)->getValue();
+            rhs = bi->use_list.at(1)->getValue();
+            op = (int)binary_op_map[bi->op];
+            type = bi->get_value_return_type();
+            inst = bi;
+        }
+        else if (comp) {
+            lhs = comp->use_list.at(0)->getValue();
+            rhs = comp->use_list.at(1)->getValue();
+            op = (int)comp_op_map[comp->op];
+            type = comp->get_value_return_type();
+            inst = comp;
+        }
+        else if (zext) {
+            lhs = zext->use_list.at(0)->getValue();
+            op = (int)Op::ZEXT;
+            type = zext->get_value_return_type();
+            inst = zext;
+        }
+        else if (trunc) {
+            lhs = trunc->use_list.at(0)->getValue();
+            type = trunc->get_value_return_type();
+            if (type == trunc->get_value_return_type()->getContext()
+                ->getBitType()) {
+                op = (int)Op::TRUC1;
+            }
+            else {
+                op = (int)Op::TRUC8;
+            }
+            inst = trunc;
+        }
+        else if (getele) {
+            lhs = getele->use_list.at(0)->getValue();
+            rhs = getele->use_list.at(1)->getValue();
+            op = (int)Op::GETELEMENT;
+            inst = getele;
+        }
+        else {
+            continue;
+        }
+        inst_reduce(lhs, rhs, op, type, inst, records);
+    }
+}
+
+void BasicBlock::inst_reduce(ValuePtr lhs, ValuePtr rhs, int op, ValueReturnTypePtr type,
+    InstructionPtr inst,
+    std::unordered_map<struct tripleIR, InstructionPtr> &records) {
+    auto left_const = dynamic_cast<ConstantPtr>(lhs);
+    auto right_const = dynamic_cast<ConstantPtr>(rhs);
+    if (!rhs && left_const) {
+        auto const_value = new Constant(get_value(left_const->get_value(), 0, op),
+                type);
+        inst->substitute_instruction_for_lvn(const_value);
+        //cannot do this
+        return;
+    }
+    if (left_const && right_const) {
+        auto const_value = new Constant(get_value(left_const->get_value(),
+            right_const->get_value(), op), type);
+        inst->substitute_instruction_for_lvn(const_value);
+        return;
+    }
+    auto triple = (struct tripleIR){op, lhs, rhs};
+    if (records.find(triple) == records.end()) {
+        records[triple] = inst;
+    }
+    else {
+        inst->substitute_instruction_for_lvn(records[triple]);
+    }
+}
+
+void BasicBlock::replace_use(ValuePtr old_value, ValuePtr new_value) {
+    for (auto it = use_list.begin(); it != use_list.end(); ) {
+        if ((*it)->getValue() == old_value) {
+            it = use_list.erase(it);
+            continue;
+        }
+        it++;
     }
 }

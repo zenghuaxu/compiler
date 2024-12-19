@@ -22,6 +22,9 @@ class User: public Value {
     }
 
     void delete_use(UsePtr use);
+
+    void mark_active_for_dce();
+
     //TODO CHECK
     //REMOVE THE BREAK
     void replace_use(ValuePtr old_value, ValuePtr new_value) {
@@ -34,10 +37,14 @@ class User: public Value {
         }
     }
 
+    void mark_child_active();
+
     ~User() override = default;
 
     protected:
     std::vector<UsePtr> use_list;
+    private:
+    bool visited = false;
 };
 
 #endif //USER_H

@@ -25,6 +25,9 @@ class Module {
     void mem2reg() {context->mem2reg();}
     void emit_bb() {context->emit_bb();}
     void delete_phi() {context->delete_phi();}
+
+    void dce() {context->dce();}
+    void lvn() {context->lvn();}
     private:
     LLVMContextPtr context;
 };

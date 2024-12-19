@@ -9,6 +9,17 @@
 
 #include "../llvm.h"
 #include "instructions.h"
+#include "../opt.h"
+
+//hash
+template<>
+struct std::hash<tripleIR> : public __hash_base<size_t, tripleIR> {
+    size_t operator()(const tripleIR& t) const noexcept {
+        return (std::hash<int>()(t.op_hash) ^
+            std::hash<ValuePtr>()(t.lhs) ^
+            std::hash<ValuePtr>()(t.rhs));
+    }
+};
 
 
 class BasicBlock: public User{
@@ -98,6 +109,15 @@ class BasicBlock: public User{
     void substitute_goto(BasicBlockPtr old_bb, BasicBlockPtr new_bb);
 
     void delete_phi();
+
+    void dce();
+
+    void LVN();
+
+    void inst_reduce(ValuePtr lhs, ValuePtr rhs, int op, ValueReturnTypePtr type, InstructionPtr inst, std::unordered_map<struct tripleIR,
+                     InstructionPtr> &records);
+
+    void replace_use(ValuePtr old_value, ValuePtr new_value);
 
     void mark_pc(PCInstructionPtr pc_inst) { pc = pc_inst;}
     PCInstructionPtr get_pc() {return pc;}

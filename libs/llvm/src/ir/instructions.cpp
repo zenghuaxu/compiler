@@ -68,6 +68,7 @@ BranchInstruction::BranchInstruction(ValuePtr condition, BasicBlockPtr true_bloc
     this->add_use(new Use(this, false_block)); //2
     current_block->insert_goto(true_block);
     current_block->insert_goto(false_block);
+    current_block->get_function()->put_useful(this);
 }
 
 void BranchInstruction::substitute(BasicBlockPtr old_block, BasicBlockPtr new_block) {
@@ -81,6 +82,7 @@ JumpInstruction::JumpInstruction(BasicBlockPtr jump_block, BasicBlockPtr current
         ValueType::JumpInst, current_block) {
     this->add_use(new Use(this, jump_block));
     current_block->insert_goto(jump_block);
+    current_block->get_function()->put_useful(this);
 }
 
 void JumpInstruction::substitute(BasicBlockPtr old_bb, BasicBlockPtr new_bb) {
@@ -103,6 +105,12 @@ TruncInstruction::TruncInstruction(ValuePtr value, BasicBlockPtr basic_block):
         Instruction(value->getContext()->getCharType(), ValueType::TruncInst, basic_block) {
     this->add_use(new Use(this, value));
 }
+
+CallInstruction::CallInstruction(ValueReturnTypePtr return_type, FunctionPtr function, BasicBlockPtr basic_block):
+    Instruction(return_type, ValueType::CallInst, basic_block), function(function) {
+    basic_block->get_function()->put_useful(this);
+}
+
 
 void CallInstruction::print_full(std::ostream &out) {
     if (get_value_return_type() !=
@@ -145,12 +153,14 @@ ReturnInstruction::ReturnInstruction(ValueReturnTypePtr return_type, FunctionPtr
         this->add_use(new Use(this, ret_val));
     }
     this->function = function;
+    basic_block->get_function()->put_useful(this);
 }
 
 LoadInstruction::LoadInstruction(ValuePtr value, BasicBlockPtr basic_block):
     Instruction(dynamic_cast<PointerTypePtr>(value->get_value_return_type())->get_referenced_type(),
         ValueType::LoadInst, basic_block) {
     this->add_use(new Use(this, value));
+    //basic_block->get_function()->put_useful(this);
 }
 
 StoreInstruction::StoreInstruction(ValuePtr value, ValuePtr addr, BasicBlockPtr basic_block):
@@ -158,6 +168,12 @@ StoreInstruction::StoreInstruction(ValuePtr value, ValuePtr addr, BasicBlockPtr 
             , ValueType::StoreInst, basic_block) {
     this->add_use(new Use(this, value));
     this->add_use(new Use(this, addr));
+    basic_block->get_function()->put_useful(this);
+}
+
+InputInstruction::InputInstruction(ValueReturnTypePtr return_type, BasicBlockPtr basic_block, bool ch_type):
+    Instruction(return_type, ValueType::InputInst, basic_block), ch_type(ch_type) {
+    basic_block->get_function()->put_useful(this);
 }
 
 OutputInstruction::OutputInstruction(ValuePtr value, BasicBlockPtr  basic_block):
@@ -165,6 +181,7 @@ OutputInstruction::OutputInstruction(ValuePtr value, BasicBlockPtr  basic_block)
             ValueType::OutputInst, basic_block), ch(false) {
     value_return_type = value->get_value_return_type();
     this->add_use(new Use(this, value));
+    basic_block->get_function()->put_useful(this);
 }
 
 OutputInstruction::OutputInstruction(ValuePtr value, BasicBlockPtr basic_block, bool ch):
@@ -172,6 +189,7 @@ OutputInstruction::OutputInstruction(ValuePtr value, BasicBlockPtr basic_block, 
             ValueType::OutputInst, basic_block), ch(ch) {
     value_return_type = value->get_value_return_type();
     this->add_use(new Use(this, value));
+    basic_block->get_function()->put_useful(this);
 }
 
 GetElementPtrInstruction::GetElementPtrInstruction(ValuePtr base, ValuePtr offset, BasicBlockPtr basic_block):
@@ -217,12 +235,41 @@ void PhiInstruction::add_option(ValuePtr value, BasicBlockPtr basic_block) {
 }
 
 //JUST FOR LOAD!!! OTHERS MAY ERR
+//TODO TRY TO USE
 void Instruction::substitute_instruction(ValuePtr value) {
     for (auto user:user_list) {
         //TODO ADD USE INTER THE FOLLOW FUNCTION
+        auto block = dynamic_cast<BasicBlockPtr>(user);
         user->replace_use(this, value);
     }
 }
+
+void Instruction::substitute_instruction_for_lvn(ValuePtr value) {
+    for (auto user:user_list) {
+        //TODO ADD USE INTER THE FOLLOW FUNCTION
+        auto block = dynamic_cast<BasicBlockPtr>(user);
+        if (block) {
+            block->replace_use(this, value);
+            continue;
+        }
+        auto phi = dynamic_cast<PhiInstructionPtr>(user);
+        if (phi) {
+            phi->replace_use(this, value);
+        }
+        user->replace_use(this, value);
+    }
+}
+
+void PhiInstruction::replace_use(ValuePtr old_value, ValuePtr new_value) {
+    for (auto & i : this->options) {
+        if (i.second == old_value) {
+            i.second = new_value;
+            new_value->add_user(this);
+            //break;
+        }
+    }
+}
+
 
 PCInstruction::PCInstruction(BasicBlockPtr basic_block):
     Instruction(basic_block->getContext()->getVoidType(), ValueType::PCInst, basic_block) {
