@@ -83,12 +83,6 @@ bool BasicBlock::enable_pad() {
 
 void BasicBlock::mark_active(int i) {
     for (auto it: in_set) {
-// #ifdef MIPS_DEBUG
-//         for (auto it: in_set) {
-//             it->print_full(std::cout);
-//             std::cout << " func:" << function->get_name() << " block: "  << id << std::endl;
-//         }
-// #endif
         std::visit(overloaded{
             [this, i](InstructionPtr &it) { it->mark_active(i); },
             [this, i](ArgumentPtr &it) { it->mark_active(i); },

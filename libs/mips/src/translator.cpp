@@ -94,6 +94,9 @@ void Translator::translate(FunctionPtr function, std::vector<MipsInstPtr> &insts
 void Translator::translate(BasicBlockPtr bb, std::vector<MipsInstPtr> &insts, DynamicOffsetPtr offset,
     int no, std::string &name) {
     new Tag(insts, name + "_" + std::to_string(bb->id));
+    for (auto i = 0; i < TMP_NUM; i++) {
+        manager->tmp.at(i)->release_occupied();
+    }
     for (auto it : bb->use_list) {
         auto inst = dynamic_cast<InstructionPtr>(it->getValue());
         if (typeid(*inst) == typeid(AllocaInstruction)) {
