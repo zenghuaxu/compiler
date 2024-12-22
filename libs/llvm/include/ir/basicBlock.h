@@ -115,7 +115,7 @@ class BasicBlock: public User{
     void LVN();
 
     void inst_reduce(ValuePtr lhs, ValuePtr rhs, int op, ValueReturnTypePtr type, InstructionPtr inst, std::unordered_map<struct tripleIR,
-                     InstructionPtr> &records);
+                     InstructionPtr> &records, std::unordered_map<int, ConstantPtr> &const_map);
 
     void replace_use(ValuePtr old_value, ValuePtr new_value);
 

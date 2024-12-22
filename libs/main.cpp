@@ -65,10 +65,15 @@ int main() {
     }
     err.close();
 
+    if (!errors.empty()) {
+        return 0;
+    }
     module->emit_bb();
     module->mem2reg();
     module->dce();
-    module->lvn();
+    for (auto i = 0; i < 10; i++) {
+        module->lvn();
+    }
     module->delete_phi();
     #ifdef LLVM_IR
     OUTPUT_OPEN(output, llvm_ir.txt);

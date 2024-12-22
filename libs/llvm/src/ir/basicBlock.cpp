@@ -385,6 +385,7 @@ void BasicBlock::dce() {
 
 void BasicBlock::LVN() {
     std::unordered_map<struct tripleIR, InstructionPtr> records;
+    std::unordered_map<int, ConstantPtr> const_map;
     for (auto it:use_list) {
         auto un = dynamic_cast<UnaryOpInstructionPtr>(it->getValue());
         auto bi = dynamic_cast<BinaryInstructionPtr>(it->getValue());
@@ -443,13 +444,14 @@ void BasicBlock::LVN() {
         else {
             continue;
         }
-        inst_reduce(lhs, rhs, op, type, inst, records);
+        inst_reduce(lhs, rhs, op, type, inst, records, const_map);
     }
 }
 
 void BasicBlock::inst_reduce(ValuePtr lhs, ValuePtr rhs, int op, ValueReturnTypePtr type,
     InstructionPtr inst,
-    std::unordered_map<struct tripleIR, InstructionPtr> &records) {
+    std::unordered_map<struct tripleIR, InstructionPtr> &records,
+    std::unordered_map<int, ConstantPtr> &const_map) {
     auto left_const = dynamic_cast<ConstantPtr>(lhs);
     auto right_const = dynamic_cast<ConstantPtr>(rhs);
     if (!rhs && left_const) {
@@ -465,6 +467,23 @@ void BasicBlock::inst_reduce(ValuePtr lhs, ValuePtr rhs, int op, ValueReturnType
         inst->substitute_instruction_for_lvn(const_value);
         return;
     }
+    // if (left_const) {
+    //     if (const_map.find(left_const->get_value()) == const_map.end()) {
+    //         const_map[left_const->get_value()] = left_const;
+    //     }
+    //     else {
+    //         lhs = const_map.at(left_const->get_value());
+    //     }
+    // }
+    // if (right_const) {
+    //     if (const_map.find(right_const->get_value()) == const_map.end()) {
+    //         const_map[right_const->get_value()] = right_const;
+    //     }
+    //     else {
+    //         rhs = const_map.at(right_const->get_value());
+    //     }
+    // }
+
     auto triple = (struct tripleIR){op, lhs, rhs};
     if (records.find(triple) == records.end()) {
         records[triple] = inst;
