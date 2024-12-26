@@ -8,6 +8,7 @@
 #include "error.h"
 #include "symtable.h"
 #include "../../llvm/include/llvm.h"
+#include "../../include/configure.h"
 
 #define BLOCK_WITH_RETURN 1
 #define BLOCK_WITHOUT_RETURN 0

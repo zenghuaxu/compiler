@@ -32,29 +32,31 @@ int main() {
     }
     input.close();
     #ifdef LEXER_
-        OUTPUT_OPEN(output, lexer.txt)
+        OUTPUT_OPEN(output_lexer, lexer.txt)
         for (const Token& token : tokens) {
-            output << token.toString() << std::endl;
+            output_lexer << token.toString() << std::endl;
         }
-        output.close();
+        output_lexer.close();
     #endif
 
     //syntactic analysis
     auto parser = Parser(tokens, errors);
     auto comp_unit_ptr = parser.parser();
     #ifdef  PARSER_
-        OUTPUT_OPEN(output, parser.txt)
-        comp_unit_ptr->print(output);
-        output.close();
+        OUTPUT_OPEN(output_parser, parser.txt)
+        comp_unit_ptr->print(output_parser);
+        output_parser.close();
     #endif
 
     //semantic analysis
     comp_unit_ptr->print(std::cout);
     auto visitor = Visitor(errors);
     auto module = visitor.visit(*comp_unit_ptr);
+
     #ifdef SEMANTIC_
-        OUTPUT_OPEN(output, symbol.txt)
-        visitor.print_symbol(output);
+        OUTPUT_OPEN(output_symbol, symbol.txt)
+        visitor.print_symbol(output_symbol);
+        output_symbol.close();
     #endif
 
     //error output
@@ -71,9 +73,10 @@ int main() {
     module->emit_bb();
     module->mem2reg();
     module->dce();
-    for (auto i = 0; i < 10; i++) {
-        module->lvn();
-    }
+    //module->lvn();
+    // for (auto i = 0; i < 10; i++) {
+    //     module->lvn();
+    // }
     module->delete_phi();
     #ifdef LLVM_IR
     OUTPUT_OPEN(output, llvm_ir.txt);
@@ -88,5 +91,6 @@ int main() {
 
     OUTPUT_OPEN(mips_out, mips.txt);
     mips->print(mips_out);
+    mips_out.close();
     return 0;
 }

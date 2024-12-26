@@ -55,9 +55,14 @@ void Visitor::init_local_object(ValuePtr value, std::shared_ptr<Symbol> symbol,
         case ConstInitVal::constExp: {
             auto init = visit_add_exp(*const_exps.at(0)->add_exp, init_type);
             if (!value) {
-                assert(typeid(*init) == typeid(Constant));
-                auto constant = dynamic_cast<ConstantPtr>(init);
-                symbol->insert_value(constant);
+                if (typeid(*init) != typeid(Constant)) {
+                    symbol->insert_value(new Constant(0, current_module->getContext()->getIntType()));
+                }
+                //assert(typeid(*init) == typeid(Constant));
+                else {
+                    auto constant = dynamic_cast<ConstantPtr>(init);
+                    symbol->insert_value(constant);
+                }
                 //TODO BRACEDCONSTEXP 也有可能
                 return;
             }
@@ -145,6 +150,7 @@ void Visitor::visit_const_def(ConstDef &node,
     }
     else {
         errors.emplace_back('b', node.identifier->getLine());
+        return;
     }
 
     //3.INITIALIZATION
@@ -190,6 +196,7 @@ void Visitor::visit_var_def(VarDef &node,
     }
     else {
         errors.emplace_back('b', node.identifier->getLine());
+        return;
     }
 
     //3.INITIALIZATION

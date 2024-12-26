@@ -34,7 +34,9 @@ void Visitor::visit_decl(Decl &node, bool isGlobal) {
 
 ValuePtr Visitor::allocation(const std::shared_ptr<SymType>& type, bool isGlobal, bool isConst, std::string ident) {
     ValuePtr value = nullptr;
-    if (isConst && typeid(*type) != typeid(ArrayType)) {/*do nothing*/}
+    if (isConst && typeid(*type) != typeid(ArrayType)) {
+        return value;/*do nothing*/
+    }
     else if (isGlobal) {
         value = new GlobalValue(type->toValueType(current_module->getContext()), ident);
     }

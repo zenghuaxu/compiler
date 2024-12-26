@@ -7,13 +7,13 @@
 //#define DEBUG
 // #define DEBUG_PARSER
 //#define DEBUG_SEMANTIC
-#define IR_DEBUG
+//#define IR_DEBUG
 #define MIPS_DEBUG
 
-//#define LEXER_
-//#define PARSER_
-//#define SEMANTIC_
-//#define SYMTABLE_
+#define LEXER_
+#define PARSER_
+#define SEMANTIC_
+#define SYMTABLE_
 #define LLVM_IR
 
 #define MACRO_H
