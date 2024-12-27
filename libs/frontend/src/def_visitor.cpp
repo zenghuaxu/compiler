@@ -55,14 +55,14 @@ void Visitor::init_local_object(ValuePtr value, std::shared_ptr<Symbol> symbol,
         case ConstInitVal::constExp: {
             auto init = visit_add_exp(*const_exps.at(0)->add_exp, init_type);
             if (!value) {
-                if (typeid(*init) != typeid(Constant)) {
-                    symbol->insert_value(new Constant(0, current_module->getContext()->getIntType()));
-                }
-                //assert(typeid(*init) == typeid(Constant));
-                else {
+                ///if (typeid(*init) != typeid(Constant)) {
+                //    symbol->insert_value(new Constant(0, current_module->getContext()->getIntType()));
+                //}
+                assert(typeid(*init) == typeid(Constant));
+                //else {
                     auto constant = dynamic_cast<ConstantPtr>(init);
                     symbol->insert_value(constant);
-                }
+                //}
                 //TODO BRACEDCONSTEXP 也有可能
                 return;
             }
@@ -150,6 +150,12 @@ void Visitor::visit_const_def(ConstDef &node,
     }
     else {
         errors.emplace_back('b', node.identifier->getLine());
+        if (node.const_init_val) {
+            for (const auto & const_exp : node.const_init_val->const_exps) {
+                std::shared_ptr<SymType> tmp;
+                visit_add_exp(*const_exp->add_exp, tmp);
+            }
+        }
         return;
     }
 
@@ -196,6 +202,12 @@ void Visitor::visit_var_def(VarDef &node,
     }
     else {
         errors.emplace_back('b', node.identifier->getLine());
+        if (node.init_val) {
+            for (const auto & exp : node.init_val->exps) {
+                std::shared_ptr<SymType> tmp;
+                visit_add_exp(*exp->add_exp, tmp);
+            }
+        }
         return;
     }
 
